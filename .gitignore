@@ -1,3 +1,6 @@
+# OPK files
+*.opk
+
 # Object files
 *.o
 *.obj

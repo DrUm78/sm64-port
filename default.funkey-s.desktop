@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=sm64-port
 Comment=SM64 port by gameblabla based on MSDOS port
-Exec=run.sh
+Exec=sm64.us.f3dex2e
 Terminal=false
 Type=Application
 StartupNotify=true
