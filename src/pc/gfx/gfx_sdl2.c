@@ -326,10 +326,10 @@ static void gfx_sdl_handle_events(void) {
 #ifndef TARGET_WEB
             // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
             case SDL_KEYDOWN:
-				if (event.key.keysym.sym == SDLK_ESCAPE)
-				{
-					game_exit();
-				}
+        				if (event.key.keysym.sym == SDLK_q)
+        				{
+        					game_exit();
+        				}
                 gfx_sdl_onkeydown(event.key.keysym.sym);
                 break;
             case SDL_KEYUP:

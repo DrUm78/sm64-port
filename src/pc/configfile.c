@@ -65,19 +65,35 @@ unsigned int configKeyStickRight =  4;
 #else
 // DInput scancodes
 #if defined(TARGET_LINUX)
-unsigned int configKeyA          = 29;
-unsigned int configKeyB          = 56;
-unsigned int configKeyStart      = 28;
-unsigned int configKeyR          = 14;
-unsigned int configKeyZ          = 15;
-unsigned int configKeyCUp        = 0x148;
-unsigned int configKeyCDown      = 0x150;
-unsigned int configKeyCLeft      = 0x2A;
-unsigned int configKeyCRight     = 0x39;
-unsigned int configKeyStickUp    = 584;
-unsigned int configKeyStickDown  = 592;
-unsigned int configKeyStickLeft  = 587;
-unsigned int configKeyStickRight = 589;
+    #if defined(FUNKEY)
+    unsigned int configKeyA          = 30;
+    unsigned int configKeyB          = 48;
+    unsigned int configKeyStart      = 31;
+    unsigned int configKeyR          = 49;
+    unsigned int configKeyZ          = 50;
+    unsigned int configKeyCUp        = 0x148;
+    unsigned int configKeyCDown      = 0x150;
+    unsigned int configKeyCLeft      = 0x2A;
+    unsigned int configKeyCRight     = 0x39;
+    unsigned int configKeyStickUp    = 22;
+    unsigned int configKeyStickDown  = 32;
+    unsigned int configKeyStickLeft  = 38;
+    unsigned int configKeyStickRight = 19;
+    #else
+    unsigned int configKeyA          = 29;
+    unsigned int configKeyB          = 56;
+    unsigned int configKeyStart      = 28;
+    unsigned int configKeyR          = 14;
+    unsigned int configKeyZ          = 15;
+    unsigned int configKeyCUp        = 0x148;
+    unsigned int configKeyCDown      = 0x150;
+    unsigned int configKeyCLeft      = 0x2A;
+    unsigned int configKeyCRight     = 0x39;
+    unsigned int configKeyStickUp    = 584;
+    unsigned int configKeyStickDown  = 592;
+    unsigned int configKeyStickLeft  = 587;
+    unsigned int configKeyStickRight = 589;
+    #endif
 #else
 unsigned int configKeyA          = 0x26;
 unsigned int configKeyB          = 0x33;
