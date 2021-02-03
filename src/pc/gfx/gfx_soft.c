@@ -1062,6 +1062,7 @@ static void gfx_soft_shutdown(void) {
 }
 
 static void gfx_soft_on_resize(void) {
+    gfx_soft_set_resolution(gfx_current_dimensions.width, gfx_current_dimensions.height);
 }
 
 static void gfx_soft_end_frame(void) {

@@ -135,6 +135,7 @@ static void save_config(void) {
 
 static void on_fullscreen_changed(bool is_now_fullscreen) {
     configFullscreen = is_now_fullscreen;
+    gfx_update_dimensions();
 }
 
 void game_exit(void) {
