@@ -515,10 +515,10 @@ endif
 ifeq ($(TARGET_LINUX),1)
 
 ifeq ($(TARGET_FUNKEY),1)
-  OD_TOOLCHAIN ?= /opt/funkey-toolchain/
-  CC := $(OD_TOOLCHAIN)bin/arm-linux-gcc
-  CXX := $(OD_TOOLCHAIN)bin/arm-linux-g++
-  LD := $(OD_TOOLCHAIN)bin/arm-linux-gcc
+  OD_TOOLCHAIN ?= /opt/FunKey-sdk-2.0.0/
+  CC := $(OD_TOOLCHAIN)bin/arm-funkey-linux-musleabihf-gcc
+  CXX := $(OD_TOOLCHAIN)bin/arm-funkey-linux-musleabihf-g++
+  LD := $(OD_TOOLCHAIN)bin/arm-funkey-linux-musleabihf-gcc
   MARCH :=  -march=armv7-a+neon-vfpv4 -mtune=cortex-a7 -mfpu=neon-vfpv4 -Ofast -fno-PIC -fdata-sections -ffunction-sections -fsingle-precision-constant -fno-common -fno-builtin -DFUNKEY
 endif
 
@@ -622,8 +622,8 @@ else ifeq ($(ENABLE_SOFTRAST),1)
 	  GFX_CFLAGS  += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
 	else ifeq ($(TARGET_FUNKEY),1)
-	  GFX_CFLAGS  += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
+	  GFX_CFLAGS  += $(shell /opt/FunKey-sdk-2.0.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
+	  GFX_LDFLAGS += $(shell /opt/FunKey-sdk-2.0.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
 	else ifeq ($(TARGET_BITTBOY),1)
 	  GFX_CFLAGS  += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --libs)  -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s

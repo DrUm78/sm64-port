@@ -28,6 +28,9 @@
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
 
+#define RES_HW_SCREEN_HORIZONTAL    240
+#define RES_HW_SCREEN_VERTICAL      240
+
 #if defined(VERSION_EU)
 # define FRAMERATE 25
 #else
@@ -218,7 +221,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
 #ifdef DIRECT_SDL
 	sdl_screen = SDL_SetVideoMode(window_width, window_height, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
 #else
-	texture = SDL_SetVideoMode(window_width, window_height, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
+	texture = SDL_SetVideoMode(240, 240, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
 	sdl_screen = SDL_CreateRGBSurface(SDL_HWSURFACE, window_width, window_height, 32, 0,0,0,0);
 #endif
 #endif
@@ -360,6 +363,139 @@ static uint16_t rgb888Torgb565(uint32_t s)
 	return (uint16_t) ((s >> 8 & 0xf800) + (s >> 5 & 0x7e0) + (s >> 3 & 0x1f));
 }
 
+
+/* Clear SDL screen (for multiple-buffering) */
+static void clear_screen(SDL_Surface *surface) {
+  memset(surface->pixels, 0, surface->w*surface->h*surface->format->BytesPerPixel);
+}
+
+
+/// Nearest neighboor optimized with possible out of screen coordinates (for cropping)
+static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Surface *dst_surface, int new_w, int new_h) {
+  int w1 = src_surface->w;
+  int h1 = src_surface->h;
+  int w2 = new_w;
+  int h2 = new_h;
+  int x_ratio = (int) ((w1 << 16) / w2);
+  int y_ratio = (int) ((h1 << 16) / h2);
+  int x2, y2;
+
+  /// --- Compute padding for centering when out of bounds ---
+  int y_padding = (RES_HW_SCREEN_VERTICAL - new_h) / 2;
+  int x_padding = 0;
+  if (w2 > RES_HW_SCREEN_HORIZONTAL) {
+    x_padding = (w2 - RES_HW_SCREEN_HORIZONTAL) / 2 + 1;
+  }
+  int x_padding_ratio = x_padding * w1 / w2;
+
+  for (int i = 0; i < h2; i++) {
+    if (i >= RES_HW_SCREEN_VERTICAL) {
+      continue;
+    }
+
+    uint32_t *t = ((uint32_t *)dst_surface->pixels) + ((i + y_padding) * ((w2 > RES_HW_SCREEN_HORIZONTAL) ? RES_HW_SCREEN_HORIZONTAL : w2)) ;
+    y2 = (i * y_ratio) >> 16;
+    uint32_t *p = (uint32_t*)(src_surface->pixels) + (y2*w1 + x_padding_ratio) ;
+    int rat = 0;
+    for (int j = 0; j < w2; j++) {
+      if (j >= RES_HW_SCREEN_HORIZONTAL) {
+        continue;
+      }
+      x2 = rat >> 16;
+      *t++ = p[x2];
+      rat += x_ratio;
+    }
+  }
+}
+
+
+
+/// Nearest neighboor optimized with possible out of screen coordinates (for cropping)
+void flip_Upscaling_Bilinear(SDL_Surface *src_surface, SDL_Surface *dst_surface, int new_w, int new_h){
+  int w1=src_surface->w;
+  int h1=src_surface->h;
+  int w2=new_w;
+  int h2=new_h;
+  int x_ratio = (int)((src_surface->w<<16)/w2);
+  int y_ratio = (int)((src_surface->h<<16)/h2);
+  uint32_t x_diff, y_diff;
+  uint32_t red_comp, green_comp, blue_comp, alpha_comp;
+  uint32_t p_val_tl, p_val_tr, p_val_bl, p_val_br;
+  int x, y ;
+  //printf("src_surface->h=%d, h2=%d\n", src_surface->h, h2);
+
+  /// --- Compute padding for centering when out of bounds ---
+  int y_padding = (RES_HW_SCREEN_VERTICAL-new_h)/2;
+  int x_padding = 0;
+  if(w2>RES_HW_SCREEN_HORIZONTAL){
+    x_padding = (w2-RES_HW_SCREEN_HORIZONTAL)/2 + 1;
+  }
+  int x_padding_ratio = x_padding*w1/w2;
+
+  for (int i=0;i<h2;i++)
+  {
+    if(i>=RES_HW_SCREEN_VERTICAL){
+      continue;
+    }
+
+    uint32_t* t = (uint32_t*)(dst_surface->pixels) + ((i+y_padding)*((w2>RES_HW_SCREEN_HORIZONTAL)?RES_HW_SCREEN_HORIZONTAL:w2)) ;
+    y = ((i*y_ratio)>>16);
+    y_diff = (i*y_ratio) - (y<<16) ;
+    uint32_t* p = (uint32_t*)(src_surface->pixels) + (y*w1 + x_padding_ratio) ;
+    int rat = 0;
+    for (int j=0;j<w2;j++)
+    {
+      if(j>=RES_HW_SCREEN_HORIZONTAL){
+        continue;
+      }
+      x = (rat>>16);
+      x_diff = rat - (x<<16) ;
+
+      /// --- Getting adjacent pixels ---
+      p_val_tl = p[x] ;
+      p_val_tr = (x+1<w1)?p[x+1]:p[x];
+      p_val_bl = (y+1<h1)?p[x+w1]:p[x];
+      p_val_br = (y+1<h1 && x+1<w1)?p[x+w1+1]:p[x];
+
+      // red element
+      // Yr = Ar(1-w)(1-h) + Br(w)(1-h) + Cr(h)(1-w) + Dr(wh)
+      red_comp = (( ((p_val_tl&0xFF000000)>>24) * ( (((1<<16)-x_diff) * ((1<<16)-y_diff)) >>8) )>>24) +
+          (( ((p_val_tr&0xFF000000)>>24) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
+            (( ((p_val_bl&0xFF000000)>>24) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
+            (( ((p_val_br&0xFF000000)>>24) * ((y_diff * x_diff) >>8) )>>24);
+
+      // green element
+      // Yg = Ag(1-w)(1-h) + Bg(w)(1-h) + Cg(h)(1-w) + Dg(wh)
+      green_comp = (( ((p_val_tl&0x00FF0000)>>16) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
+          (( ((p_val_tr&0x00FF0000)>>16) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
+            (( ((p_val_bl&0x00FF0000)>>16) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
+            (( ((p_val_br&0x00FF0000)>>16) * ((y_diff * x_diff) >>8) )>>24);
+
+      // blue element
+      // Yb = Ab(1-w)(1-h) + Bb(w)(1-h) + Cb(h)(1-w) + Db(wh)
+      blue_comp = (( ((p_val_tl&0x0000FF00)>>8) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
+          (( ((p_val_tr&0x0000FF00)>>8) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
+            (( ((p_val_bl&0x0000FF00)>>8) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
+            (( ((p_val_br&0x0000FF00)>>8) * ((y_diff * x_diff) >>8) )>>24);
+
+      // alpha element
+      // Ya = Aa(1-w)(1-h) + Ba(w)(1-h) + Ca(h)(1-w) + Da(wh)
+      alpha_comp = (( ((p_val_tl&0x000000FF)) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
+          (( ((p_val_tr&0x000000FF)) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
+            (( ((p_val_bl&0x000000FF)) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
+            (( ((p_val_br&0x000000FF)) * ((y_diff * x_diff) >>8) )>>24);
+
+     //   printf("red_comp=%d, green_comp=%d, blue_comp=%d, alpha_comp=%d, \n", red_comp, green_comp, blue_comp, alpha_comp);
+
+      /// --- Write pixel value ---
+      *t++ = ((red_comp<<24)&0xFF000000) + ((green_comp<<16)&0x00FF0000) + ((blue_comp<<8)&0x0000FF00) + ((alpha_comp)&0x000000FF);
+
+      /// --- Update x ----
+      rat += x_ratio;
+    }
+  }
+}
+
 static void gfx_sdl_swap_buffers_begin(void) {
     if (!vsync_enabled) {
         sync_framerate_with_timer();
@@ -372,13 +508,18 @@ static void gfx_sdl_swap_buffers_begin(void) {
 #endif
 	SDL_Flip(sdl_screen);
 #else
+    /*#ifndef SDL_SURFACE
+    	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
+    #else
+    	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
+    #endif*/
 
-#ifndef SDL_SURFACE
-	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-#else
-	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-#endif
-	SDL_Flip(texture);
+        //flip_NNOptimized_AllowOutOfScreen(sdl_screen, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
+        //flip_NNOptimized_AllowOutOfScreen(sdl_screen, texture, 340, RES_HW_SCREEN_VERTICAL);
+        flip_Upscaling_Bilinear(sdl_screen, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
+        //flip_Upscaling_Bilinear(sdl_screen, texture, 340, RES_HW_SCREEN_VERTICAL);
+    	
+        SDL_Flip(texture);
 #endif
 #else
     SDL_GL_SwapWindow(wnd);

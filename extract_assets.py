@@ -226,6 +226,7 @@ def main():
                     png_file.write(input)
                     png_file.flush()
                     png_file.close()
+                    print("Temp file: ", png_file.name)
                     if asset.startswith("textures/skyboxes/") or asset.startswith("levels/ending/cake"):
                         if asset.startswith("textures/skyboxes/"):
                             imagetype = "sky"
@@ -245,6 +246,17 @@ def main():
                     else:
                         w, h = meta
                         fmt = asset.split(".")[-2]
+                        print("./tools/n64graphics",
+                                "-e",
+                                png_file.name,
+                                "-g",
+                                asset,
+                                "-f",
+                                fmt,
+                                "-w",
+                                str(w),
+                                "-h",
+                                str(h));
                         subprocess.run(
                             [
                                 "./tools/n64graphics",

@@ -515,7 +515,8 @@ endif
 ifeq ($(TARGET_LINUX),1)
 
 ifeq ($(TARGET_FUNKEY),1)
-  OD_TOOLCHAIN ?= /opt/funkey-toolchain/
+  #OD_TOOLCHAIN ?= /opt/funkey-toolchain/
+  OD_TOOLCHAIN ?= /opt/FunKey-sdk-1.1.0/
   CC := $(OD_TOOLCHAIN)bin/arm-linux-gcc
   CXX := $(OD_TOOLCHAIN)bin/arm-linux-g++
   LD := $(OD_TOOLCHAIN)bin/arm-linux-gcc
@@ -615,25 +616,27 @@ else ifeq ($(ENABLE_SOFTRAST),1)
     GFX_LDFLAGS += $(shell sdl-config --libs)
   endif
   ifeq ($(TARGET_LINUX),1)
-	ifeq ($(TARGET_RS97),1)
-	  GFX_CFLAGS  += $(shell /opt/rs97-toolchain/mipsel-buildroot-linux-musl/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/rs97-toolchain/mipsel-buildroot-linux-musl/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
-	else ifeq ($(TARGET_RS90),1)
-	  GFX_CFLAGS  += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
-	else ifeq ($(TARGET_FUNKEY),1)
-	  GFX_CFLAGS  += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
-	else ifeq ($(TARGET_BITTBOY),1)
-	  GFX_CFLAGS  += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --libs)  -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
-	else ifeq ($(TARGET_OD),1)
-	  GFX_CFLAGS  += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s -no-pie
-	else
-	  GFX_CFLAGS  += $(shell sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell sdl-config --libs)
-	endif
+  ifeq ($(TARGET_RS97),1)
+    GFX_CFLAGS  += $(shell /opt/rs97-toolchain/mipsel-buildroot-linux-musl/sysroot/usr/bin/sdl-config --cflags)
+    GFX_LDFLAGS += $(shell /opt/rs97-toolchain/mipsel-buildroot-linux-musl/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
+  else ifeq ($(TARGET_RS90),1)
+    GFX_CFLAGS  += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --cflags)
+    GFX_LDFLAGS += $(shell /opt/rs90-toolchain/mipsel-rs90-linux-musl/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
+  else ifeq ($(TARGET_FUNKEY),1)
+    #GFX_CFLAGS  += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
+    #GFX_LDFLAGS += $(shell /opt/funkey-toolchain/arm-buildroot-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
+    GFX_CFLAGS  += $(shell /opt/FunKey-sdk-1.1.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
+    GFX_LDFLAGS += $(shell /opt/FunKey-sdk-1.1.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
+  else ifeq ($(TARGET_BITTBOY),1)
+    GFX_CFLAGS  += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --cflags)
+    GFX_LDFLAGS += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --libs)  -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
+  else ifeq ($(TARGET_OD),1)
+    GFX_CFLAGS  += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --cflags)
+    GFX_LDFLAGS += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s -no-pie
+  else
+    GFX_CFLAGS  += $(shell sdl-config --cflags)
+    GFX_LDFLAGS += $(shell sdl-config --libs)
+  endif
   endif
   ifeq ($(TARGET_WEB),1)
     GFX_CFLAGS  += -s USE_SDL=2
@@ -691,24 +694,24 @@ endif
 ifeq ($(TARGET_N64),1)
 all: $(ROM)
 ifeq ($(COMPARE),1)
-	@$(SHA1SUM) -c $(TARGET).sha1 || (echo 'The build succeeded, but did not match the official ROM. This is expected if you are making changes to the game.\nTo silence this message, use "make COMPARE=0"'. && false)
+  @$(SHA1SUM) -c $(TARGET).sha1 || (echo 'The build succeeded, but did not match the official ROM. This is expected if you are making changes to the game.\nTo silence this message, use "make COMPARE=0"'. && false)
 endif
 else
 all: $(EXE)
 endif
 
 clean:
-	$(RM) -r $(BUILD_DIR_BASE)
+  $(RM) -r $(BUILD_DIR_BASE)
 
 distclean:
-	$(RM) -r $(BUILD_DIR_BASE)
-	./extract_assets.py --clean
+  $(RM) -r $(BUILD_DIR_BASE)
+  ./extract_assets.py --clean
 
 test: $(ROM)
-	$(EMULATOR) $(EMU_FLAGS) $<
+  $(EMULATOR) $(EMU_FLAGS) $<
 
 load: $(ROM)
-	$(LOADER) $(LOADER_FLAGS) $<
+  $(LOADER) $(LOADER_FLAGS) $<
 
 libultra: $(BUILD_DIR)/libultra.a
 
@@ -718,10 +721,10 @@ $(BUILD_DIR)/src/game/crash_screen.o: $(CRASH_TEXTURE_C_FILES)
 $(BUILD_DIR)/lib/rsp.o: $(BUILD_DIR)/rsp/rspboot.bin $(BUILD_DIR)/rsp/fast3d.bin $(BUILD_DIR)/rsp/audio.bin
 
 $(BUILD_DIR)/include/text_strings.h: include/text_strings.h.in
-	$(TEXTCONV) charmap.txt $< $@
+  $(TEXTCONV) charmap.txt $< $@
 
 $(BUILD_DIR)/include/text_menu_strings.h: include/text_menu_strings.h.in
-	$(TEXTCONV) charmap_menu.txt $< $@
+  $(TEXTCONV) charmap_menu.txt $< $@
 
 ifeq ($(COMPILER),gcc)
 $(BUILD_DIR)/lib/src/math/%.o: CFLAGS += -fno-builtin
@@ -753,10 +756,10 @@ endif
 endif
 
 $(BUILD_DIR)/text/%/define_courses.inc.c: text/define_courses.inc.c text/%/courses.h
-	$(CPP) $(VERSION_CFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) charmap.txt - $@
+  $(CPP) $(VERSION_CFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) charmap.txt - $@
 
 $(BUILD_DIR)/text/%/define_text.inc.c: text/define_text.inc.c text/%/courses.h text/%/dialogs.h
-	$(CPP) $(VERSION_CFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) charmap.txt - $@
+  $(CPP) $(VERSION_CFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) charmap.txt - $@
 
 RSP_DIRS := $(BUILD_DIR)/rsp
 ALL_DIRS := $(BUILD_DIR) $(addprefix $(BUILD_DIR)/,$(SRC_DIRS) $(ASM_DIRS) $(GODDARD_SRC_DIRS) $(ULTRA_SRC_DIRS) $(ULTRA_ASM_DIRS) $(ULTRA_BIN_DIRS) $(BIN_DIRS) $(TEXTURE_DIRS) $(TEXT_DIRS) $(SOUND_SAMPLE_DIRS) $(addprefix levels/,$(LEVEL_DIRS)) include) $(MIO0_DIR) $(addprefix $(MIO0_DIR)/,$(VERSION)) $(SOUND_BIN_DIR) $(SOUND_BIN_DIR)/sequences/$(VERSION) $(RSP_DIRS)
@@ -775,19 +778,19 @@ $(BUILD_DIR)/src/game/ingame_menu.o: $(BUILD_DIR)/include/text_strings.h
 
 # RGBA32, RGBA16, IA16, IA8, IA4, IA1, I8, I4
 $(BUILD_DIR)/%: %.png
-	$(N64GRAPHICS) -i $@ -g $< -f $(lastword $(subst ., ,$@))
+  $(N64GRAPHICS) -i $@ -g $< -f $(lastword $(subst ., ,$@))
 
 $(BUILD_DIR)/%.inc.c: $(BUILD_DIR)/% %.png
-	hexdump -v -e '1/1 "0x%X,"' $< > $@
-	echo >> $@
+  hexdump -v -e '1/1 "0x%X,"' $< > $@
+  echo >> $@
 
 # Color Index CI8
 $(BUILD_DIR)/%.ci8: %.ci8.png
-	$(N64GRAPHICS_CI) -i $@ -g $< -f ci8
+  $(N64GRAPHICS_CI) -i $@ -g $< -f ci8
 
 # Color Index CI4
 $(BUILD_DIR)/%.ci4: %.ci4.png
-	$(N64GRAPHICS_CI) -i $@ -g $< -f ci4
+  $(N64GRAPHICS_CI) -i $@ -g $< -f ci4
 
 ################################################################
 
@@ -797,89 +800,89 @@ ifeq ($(TARGET_N64),1)
 # TODO: ideally this would be `-Trodata-segment=0x07000000` but that doesn't set the address
 
 $(BUILD_DIR)/bin/%.elf: $(BUILD_DIR)/bin/%.o
-	$(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map -o $@ $<
+  $(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map -o $@ $<
 $(BUILD_DIR)/actors/%.elf: $(BUILD_DIR)/actors/%.o
-	$(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map -o $@ $<
+  $(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map -o $@ $<
 
 # Override for level.elf, which otherwise matches the above pattern
 .SECONDEXPANSION:
 $(BUILD_DIR)/levels/%/leveldata.elf: $(BUILD_DIR)/levels/%/leveldata.o $(BUILD_DIR)/bin/$$(TEXTURE_BIN).elf
-	$(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map --just-symbols=$(BUILD_DIR)/bin/$(TEXTURE_BIN).elf -o $@ $<
+  $(LD) -e 0 -Ttext=$(SEGMENT_ADDRESS) -Map $@.map --just-symbols=$(BUILD_DIR)/bin/$(TEXTURE_BIN).elf -o $@ $<
 
 $(BUILD_DIR)/bin/%.bin: $(BUILD_DIR)/bin/%.elf
-	$(EXTRACT_DATA_FOR_MIO) $< $@
+  $(EXTRACT_DATA_FOR_MIO) $< $@
 
 $(BUILD_DIR)/actors/%.bin: $(BUILD_DIR)/actors/%.elf
-	$(EXTRACT_DATA_FOR_MIO) $< $@
+  $(EXTRACT_DATA_FOR_MIO) $< $@
 
 $(BUILD_DIR)/levels/%/leveldata.bin: $(BUILD_DIR)/levels/%/leveldata.elf
-	$(EXTRACT_DATA_FOR_MIO) $< $@
+  $(EXTRACT_DATA_FOR_MIO) $< $@
 
 $(BUILD_DIR)/%.mio0: $(BUILD_DIR)/%.bin
-	$(MIO0TOOL) $< $@
+  $(MIO0TOOL) $< $@
 
 $(BUILD_DIR)/%.mio0.o: $(BUILD_DIR)/%.mio0.s
-	$(AS) $(ASFLAGS) -o $@ $<
+  $(AS) $(ASFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.mio0.s: $(BUILD_DIR)/%.mio0
-	printf ".section .data\n\n.incbin \"$<\"\n" > $@
+  printf ".section .data\n\n.incbin \"$<\"\n" > $@
 endif
 
 $(BUILD_DIR)/%.table: %.aiff
-	$(AIFF_EXTRACT_CODEBOOK) $< >$@
+  $(AIFF_EXTRACT_CODEBOOK) $< >$@
 
 $(BUILD_DIR)/%.aifc: $(BUILD_DIR)/%.table %.aiff
-	$(VADPCM_ENC) -c $^ $@
+  $(VADPCM_ENC) -c $^ $@
 
 $(BUILD_DIR)/rsp/%.bin $(BUILD_DIR)/rsp/%_data.bin: rsp/%.s
-	$(RSPASM) -sym $@.sym -definelabel $(VERSION_DEF) 1 -definelabel $(GRUCODE_DEF) 1 -strequ CODE_FILE $(BUILD_DIR)/rsp/$*.bin -strequ DATA_FILE $(BUILD_DIR)/rsp/$*_data.bin $<
+  $(RSPASM) -sym $@.sym -definelabel $(VERSION_DEF) 1 -definelabel $(GRUCODE_DEF) 1 -strequ CODE_FILE $(BUILD_DIR)/rsp/$*.bin -strequ DATA_FILE $(BUILD_DIR)/rsp/$*_data.bin $<
 
 $(ENDIAN_BITWIDTH): tools/determine-endian-bitwidth.c
-	$(CC) -c $(CFLAGS) -o $@.dummy2 $< 2>$@.dummy1; true
-	grep -o 'msgbegin --endian .* --bitwidth .* msgend' $@.dummy1 > $@.dummy2
-	head -n1 <$@.dummy2 | cut -d' ' -f2-5 > $@
-	@rm $@.dummy1
-	@rm $@.dummy2
+  $(CC) -c $(CFLAGS) -o $@.dummy2 $< 2>$@.dummy1; true
+  grep -o 'msgbegin --endian .* --bitwidth .* msgend' $@.dummy1 > $@.dummy2
+  head -n1 <$@.dummy2 | cut -d' ' -f2-5 > $@
+  @rm $@.dummy1
+  @rm $@.dummy2
 
 $(SOUND_BIN_DIR)/sound_data.ctl: sound/sound_banks/ $(SOUND_BANK_FILES) $(SOUND_SAMPLE_AIFCS) $(ENDIAN_BITWIDTH)
-	$(PYTHON) tools/assemble_sound.py $(BUILD_DIR)/sound/samples/ sound/sound_banks/ $(SOUND_BIN_DIR)/sound_data.ctl $(SOUND_BIN_DIR)/sound_data.tbl $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
+  $(PYTHON) tools/assemble_sound.py $(BUILD_DIR)/sound/samples/ sound/sound_banks/ $(SOUND_BIN_DIR)/sound_data.ctl $(SOUND_BIN_DIR)/sound_data.tbl $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
 
 $(SOUND_BIN_DIR)/sound_data.tbl: $(SOUND_BIN_DIR)/sound_data.ctl
-	@true
+  @true
 
 ifeq ($(VERSION),sh)
 $(SOUND_BIN_DIR)/sequences.bin: $(SOUND_BANK_FILES) sound/sequences.json sound/sequences/ sound/sequences/jp/ $(SOUND_SEQUENCE_FILES) $(ENDIAN_BITWIDTH)
-	$(PYTHON) tools/assemble_sound.py --sequences $@ $(SOUND_BIN_DIR)/bank_sets sound/sound_banks/ sound/sequences.json $(SOUND_SEQUENCE_FILES) $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
+  $(PYTHON) tools/assemble_sound.py --sequences $@ $(SOUND_BIN_DIR)/bank_sets sound/sound_banks/ sound/sequences.json $(SOUND_SEQUENCE_FILES) $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
 else
 $(SOUND_BIN_DIR)/sequences.bin: $(SOUND_BANK_FILES) sound/sequences.json sound/sequences/ sound/sequences/$(VERSION)/ $(SOUND_SEQUENCE_FILES) $(ENDIAN_BITWIDTH)
-	$(PYTHON) tools/assemble_sound.py --sequences $@ $(SOUND_BIN_DIR)/bank_sets sound/sound_banks/ sound/sequences.json $(SOUND_SEQUENCE_FILES) $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
+  $(PYTHON) tools/assemble_sound.py --sequences $@ $(SOUND_BIN_DIR)/bank_sets sound/sound_banks/ sound/sequences.json $(SOUND_SEQUENCE_FILES) $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
 endif
 
 $(SOUND_BIN_DIR)/bank_sets: $(SOUND_BIN_DIR)/sequences.bin
-	@true
+  @true
 
 $(SOUND_BIN_DIR)/%.m64: $(SOUND_BIN_DIR)/%.o
-	$(OBJCOPY) -j .rodata $< -O binary $@
+  $(OBJCOPY) -j .rodata $< -O binary $@
 
 $(SOUND_BIN_DIR)/%.o: $(SOUND_BIN_DIR)/%.s
-	$(AS) $(ASFLAGS) -o $@ $<
+  $(AS) $(ASFLAGS) -o $@ $<
 
 $(SOUND_BIN_DIR)/%.inc.c: $(SOUND_BIN_DIR)/%
-	hexdump -v -e '1/1 "0x%X,"' $< > $@
-	echo >> $@
+  hexdump -v -e '1/1 "0x%X,"' $< > $@
+  echo >> $@
 
 $(SOUND_BIN_DIR)/sound_data.o: $(SOUND_BIN_DIR)/sound_data.ctl.inc.c $(SOUND_BIN_DIR)/sound_data.tbl.inc.c $(SOUND_BIN_DIR)/sequences.bin.inc.c $(SOUND_BIN_DIR)/bank_sets.inc.c
 
 $(BUILD_DIR)/levels/scripts.o: $(BUILD_DIR)/include/level_headers.h
 
 $(BUILD_DIR)/include/level_headers.h: levels/level_headers.h.in
-	$(CPP) -I . levels/level_headers.h.in | $(PYTHON) tools/output_level_headers.py > $(BUILD_DIR)/include/level_headers.h
+  $(CPP) -I . levels/level_headers.h.in | $(PYTHON) tools/output_level_headers.py > $(BUILD_DIR)/include/level_headers.h
 
 $(BUILD_DIR)/assets/mario_anim_data.c: $(wildcard assets/anims/*.inc.c)
-	$(PYTHON) tools/mario_anims_converter.py > $@
+  $(PYTHON) tools/mario_anims_converter.py > $@
 
 $(BUILD_DIR)/assets/demo_data.c: assets/demo_data.json $(wildcard assets/demos/*.bin)
-	$(PYTHON) tools/demo_data_converter.py assets/demo_data.json $(VERSION_CFLAGS) > $@
+  $(PYTHON) tools/demo_data_converter.py assets/demo_data.json $(VERSION_CFLAGS) > $@
 
 ifeq ($(COMPILER),ido)
 # Source code
@@ -920,13 +923,13 @@ $(BUILD_DIR)/src/audio/synthesis.o: OPT_FLAGS := -O2 -sopt,-scalaroptimize=1 -Wp
 
 # Add a target for build/eu/src/audio/*.copt to make it easier to see debug
 $(BUILD_DIR)/src/audio/%.acpp: src/audio/%.c
-	$(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/acpp $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) $(VERSION_CFLAGS) $(MATCH_CFLAGS) $(GRUCODE_CFLAGS) -D__sgi -+ $< > $@
+  $(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/acpp $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) $(VERSION_CFLAGS) $(MATCH_CFLAGS) $(GRUCODE_CFLAGS) -D__sgi -+ $< > $@
 
 $(BUILD_DIR)/src/audio/seqplayer.copt: $(BUILD_DIR)/src/audio/seqplayer.acpp
-	$(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/copt -signed -I=$< -CMP=$@ -cp=i -scalaroptimize=1 -inline_manual
+  $(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/copt -signed -I=$< -CMP=$@ -cp=i -scalaroptimize=1 -inline_manual
 
 $(BUILD_DIR)/src/audio/%.copt: $(BUILD_DIR)/src/audio/%.acpp
-	$(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/copt -signed -I=$< -CMP=$@ -cp=i -scalaroptimize=1
+  $(QEMU_IRIX) -silent -L $(IRIX_ROOT) $(IRIX_ROOT)/usr/lib/copt -signed -I=$< -CMP=$@ -cp=i -scalaroptimize=1
 
 endif
 endif
@@ -938,49 +941,49 @@ endif
 # Rebuild files with 'GLOBAL_ASM' if the NON_MATCHING flag changes.
 $(GLOBAL_ASM_O_FILES): $(GLOBAL_ASM_DEP).$(NON_MATCHING)
 $(GLOBAL_ASM_DEP).$(NON_MATCHING):
-	@rm -f $(GLOBAL_ASM_DEP).*
-	touch $@
+  @rm -f $(GLOBAL_ASM_DEP).*
+  touch $@
 
 $(BUILD_DIR)/%.o: %.cpp
-	@$(CXX) -fsyntax-only $(CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
-	$(CXX) -c $(CFLAGS) -o $@ $<
+  @$(CXX) -fsyntax-only $(CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
+  $(CXX) -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: %.c
-	@$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
-	$(CC) -c $(CFLAGS) -o $@ $<
+  @$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
+  $(CC) -c $(CFLAGS) -o $@ $<
 
 
 $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.c
-	@$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
-	$(CC) -c $(CFLAGS) -o $@ $<
+  @$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
+  $(CC) -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: %.s
-	$(AS) $(ASFLAGS) -MD $(BUILD_DIR)/$*.d -o $@ $<
+  $(AS) $(ASFLAGS) -MD $(BUILD_DIR)/$*.d -o $@ $<
 
 ifeq ($(TARGET_N64),1)
 $(BUILD_DIR)/$(LD_SCRIPT): $(LD_SCRIPT)
-	$(CPP) $(VERSION_CFLAGS) -MMD -MP -MT $@ -MF $@.d -I include/ -I . -DBUILD_DIR=$(BUILD_DIR) -o $@ $<
+  $(CPP) $(VERSION_CFLAGS) -MMD -MP -MT $@ -MF $@.d -I include/ -I . -DBUILD_DIR=$(BUILD_DIR) -o $@ $<
 
 $(BUILD_DIR)/libultra.a: $(ULTRA_O_FILES)
-	$(AR) rcs -o $@ $(ULTRA_O_FILES)
-	tools/patch_libultra_math $@
+  $(AR) rcs -o $@ $(ULTRA_O_FILES)
+  tools/patch_libultra_math $@
 
 $(BUILD_DIR)/libgoddard.a: $(GODDARD_O_FILES)
-	$(AR) rcs -o $@ $(GODDARD_O_FILES)
+  $(AR) rcs -o $@ $(GODDARD_O_FILES)
 
 $(ELF): $(O_FILES) $(MIO0_OBJ_FILES) $(SOUND_OBJ_FILES) $(SEG_FILES) $(BUILD_DIR)/$(LD_SCRIPT) undefined_syms.txt $(BUILD_DIR)/libultra.a $(BUILD_DIR)/libgoddard.a
-	$(LD) -L $(BUILD_DIR) $(LDFLAGS) -o $@ $(O_FILES)$(LIBS) -lultra -lgoddard
+  $(LD) -L $(BUILD_DIR) $(LDFLAGS) -o $@ $(O_FILES)$(LIBS) -lultra -lgoddard
 
 $(ROM): $(ELF)
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $(@:.z64=.bin) -O binary
-	$(N64CKSUM) $(@:.z64=.bin) $@
+  $(OBJCOPY) $(OBJCOPYFLAGS) $< $(@:.z64=.bin) -O binary
+  $(N64CKSUM) $(@:.z64=.bin) $@
 
 $(BUILD_DIR)/$(TARGET).objdump: $(ELF)
-	$(OBJDUMP) -D $< > $@
+  $(OBJDUMP) -D $< > $@
 
 else
 $(EXE): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES)
-	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+  $(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
 endif
 
 

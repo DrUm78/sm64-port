@@ -20,7 +20,9 @@
 #define SCALE_8_4(VAL_) ((VAL_) / 0x11)
 #define SCALE_3_8(VAL_) ((VAL_) * 0x24)
 #define SCALE_8_3(VAL_) ((VAL_) / 0x24)
-
+//#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+//#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define ABS(x) (((x) < 0) ? (-x) : (x))
 
 typedef struct
 {
@@ -317,6 +319,12 @@ int i2raw(uint8_t *raw, const ia *img, int width, int height, int depth)
    return size;
 }
 
+//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4
+//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_9
+//#define BLUR_FOR_DOWNSCALE_GAUSSIAN 2
+//#define DILATING_FOR_DOWNSCALE_HARCODED_4
+//#define DILATING_FOR_DOWNSCALE 2
+//#define DILATING_FOR_DOWNSCALE_FORWARD 2
 
 //---------------------------------------------------------
 // internal RGBA/IA -> PNG
@@ -330,6 +338,89 @@ int rgba2png(const char *png_filename, const rgba *img, int width, int height)
    // convert to format stb_image_write expects
    uint8_t *data = malloc(4*width*height);
    if (data) {
+#if defined(BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4)
+      
+      // Basic avg of adjacent pixels for downscaling from 320x240 to 160x120
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            int idx_right = j*width + MIN(i+1, width-1);
+            int idx_bot = MIN(j+1, height-1)*width + i;
+            int idx_bot_right = MIN(j+1, height-1)*width + MIN(i+1, width-1);
+            data[4*idx]     = ((int)img[idx].red + (int)img[idx_right].red + (int)img[idx_bot].red + (int)img[idx_bot_right].red)/4;
+            data[4*idx + 1] = ((int)img[idx].green + (int)img[idx_right].green + (int)img[idx_bot].green + (int)img[idx_bot_right].green)/4;
+            data[4*idx + 2] = ((int)img[idx].blue + (int)img[idx_right].blue + (int)img[idx_bot].blue + (int)img[idx_bot_right].blue)/4;
+            data[4*idx + 3] = ((int)img[idx].alpha + (int)img[idx_right].alpha + (int)img[idx_bot].alpha + (int)img[idx_bot_right].alpha)/4;
+         }
+      }
+#elif defined(BLUR_FOR_DOWNSCALE_GAUSSIAN)
+
+      /// ---- Interpolation params ----
+      int max_pix_interpolate = BLUR_FOR_DOWNSCALE_GAUSSIAN;
+      if(max_pix_interpolate > 3 || max_pix_interpolate<1){
+         printf("ERROR cannot interpolate more than 3x3 px\n");
+         return -1;
+      }
+
+      /// ---- Convolutional mask ----
+      int mask_weight_5x5[] = {36, 24, 6,   24, 16, 4,    6, 4, 1};
+      int mask_weight_3x3[] = {4, 2,  2, 1};
+      int mask_weight_1x1[] = {1};
+      int *mask_weight;
+      if(max_pix_interpolate==3){
+         mask_weight = mask_weight_5x5;
+      }
+      else if(max_pix_interpolate==2){
+         mask_weight = mask_weight_3x3;
+      }
+      else{
+         mask_weight = mask_weight_1x1;
+      }
+
+
+      // Gaussian weighting of adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            /** tmp values */
+            uint32_t red_comp=0, green_comp=0, blue_comp=0, alpha_comp=0;
+            int ponderation_factor=0;
+
+            // Convolution here
+            for(int cur_px_diff_y=-max_pix_interpolate+1; cur_px_diff_y<max_pix_interpolate; cur_px_diff_y++){
+               int j_conv = ABS(j+cur_px_diff_y);
+               if(j_conv > height-1){
+                  j_conv = height - 1 - ABS(cur_px_diff_y);
+               }
+
+               for(int cur_px_diff_x=-max_pix_interpolate+1; cur_px_diff_x<max_pix_interpolate; cur_px_diff_x++){
+                  int i_conv = ABS(i+cur_px_diff_x);
+                  if(i_conv > width-1){
+                     i_conv = width - 1 - ABS(cur_px_diff_x);
+                  }
+                  int idx_conv = j_conv*width + i_conv;
+                  int weight = mask_weight[ABS(cur_px_diff_y)*max_pix_interpolate+ABS(cur_px_diff_x)];
+
+                  red_comp    += img[idx_conv].red*weight;
+                  green_comp  += img[idx_conv].green*weight;
+                  blue_comp   += img[idx_conv].blue*weight;
+                  alpha_comp  += img[idx_conv].alpha*weight;
+                  ponderation_factor += weight;
+
+                  //printf("weight=%d, ponderation_factor=%d, red_comp=%d, green_comp=%d, blue_comp=%d\n", weight, ponderation_factor, red_comp, green_comp, blue_comp);
+               }
+            }
+
+            // Weighted values here
+            data[4*idx]     = red_comp/ponderation_factor;
+            data[4*idx + 1] = green_comp/ponderation_factor;
+            data[4*idx + 2] = blue_comp/ponderation_factor;
+            data[4*idx + 3] = alpha_comp/ponderation_factor;
+            //printf("data[%d]=%d, red_comp=%d, ponderation_factor=%d, red_comp/ponderation_factor=%d\n", 4*idx, data[4*idx], red_comp, ponderation_factor, red_comp/ponderation_factor);
+         }
+      }
+#else //NO BLUR FOR DOWNSCALE
+
       for (int j = 0; j < height; j++) {
          for (int i = 0; i < width; i++) {
             int idx = j*width + i;
@@ -339,6 +430,7 @@ int rgba2png(const char *png_filename, const rgba *img, int width, int height)
             data[4*idx + 3] = img[idx].alpha;
          }
       }
+#endif //BLUR FOR DOWNSCALE
 
       ret = stbi_write_png(png_filename, width, height, 4, data, 0);
 
@@ -348,14 +440,217 @@ int rgba2png(const char *png_filename, const rgba *img, int width, int height)
    return ret;
 }
 
+// This is mainly for texts -> important to blur for downscale
 int ia2png(const char *png_filename, const ia *img, int width, int height)
 {
    int ret = 0;
    INFO("Saving IA %dx%d to \"%s\"\n", width, height, png_filename);
+   //printf("Saving IA %dx%d to \"%s\"\n", width, height, png_filename);
 
    // convert to format stb_image_write expects
    uint8_t *data = malloc(2*width*height);
    if (data) {
+#if defined(BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4)
+      
+      // Basic avg of 4 adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            int idx_right = j*width + MIN(i+1, width-1);
+            int idx_bot = MIN(j+1, height-1)*width + i;
+            int idx_bot_right = MIN(j+1, height-1)*width + MIN(i+1, width-1);
+            data[2*idx]     = ((int)img[idx].intensity + (int)img[idx_right].intensity + (int)img[idx_bot].intensity + (int)img[idx_bot_right].intensity)/4;
+            data[2*idx + 1] = ((int)img[idx].alpha + (int)img[idx_right].alpha + (int)img[idx_bot].alpha + (int)img[idx_bot_right].alpha)/4;
+         }
+      }
+#elif defined(BLUR_FOR_DOWNSCALE_AVG_HARDCODED_9)
+      
+      // Basic avg of 9 adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            int idx_right = j*width + MIN(i+1, width-1);
+            int idx_right_right = j*width + MIN(i+2, width-1);
+            int idx_bot = MIN(j+1, height-1)*width + i;
+            int idx_bot_right = MIN(j+1, height-1)*width + MIN(i+1, width-1);
+            int idx_bot_right_right = MIN(j+1, height-1)*width + MIN(i+2, width-1);
+            int idx_bot_bot = MIN(j+2, height-1)*width + i;
+            int idx_bot_bot_right = MIN(j+2, height-1)*width + MIN(i+1, width-1);
+            int idx_bot_bot_right_right = MIN(j+2, height-1)*width + MIN(i+2, width-1);
+            data[2*idx]     = (  (int)(img[idx].intensity) + 
+                                 (int)(img[idx_right].intensity) + 
+                                 (int)(img[idx_right_right].intensity) + 
+                                 (int)(img[idx_bot].intensity) + 
+                                 (int)(img[idx_bot_right].intensity) +
+                                 (int)(img[idx_bot_right_right].intensity) +
+                                 (int)(img[idx_bot_bot].intensity) + 
+                                 (int)(img[idx_bot_bot_right].intensity) +
+                                 (int)(img[idx_bot_bot_right_right].intensity)
+                              )/9;
+            data[2*idx + 1] = (  (int)(img[idx].alpha) + 
+                                 (int)(img[idx_right].alpha) + 
+                                 (int)(img[idx_right_right].alpha) + 
+                                 (int)(img[idx_bot].alpha) + 
+                                 (int)(img[idx_bot_right].alpha) +
+                                 (int)(img[idx_bot_right_right].alpha) +
+                                 (int)(img[idx_bot_bot].alpha) + 
+                                 (int)(img[idx_bot_bot_right].alpha) +
+                                 (int)(img[idx_bot_bot_right_right].alpha) 
+                              )/9;
+         }
+      }
+#elif defined(BLUR_FOR_DOWNSCALE_GAUSSIAN)
+
+      /// ---- Interpolation params ----
+      int max_pix_interpolate = BLUR_FOR_DOWNSCALE_GAUSSIAN;
+      if(max_pix_interpolate > 3 || max_pix_interpolate<1){
+         printf("ERROR cannot interpolate more than 3x3 px\n");
+         return -1;
+      }
+
+      /// ---- Convolutional mask ----
+      int mask_weight_5x5[] = {36, 24, 6,   24, 16, 4,    6, 4, 1};
+      int mask_weight_3x3[] = {4, 2,  2, 1};
+      int mask_weight_1x1[] = {1};
+      int *mask_weight;
+      if(max_pix_interpolate==3){
+         mask_weight = mask_weight_5x5;
+      }
+      else if(max_pix_interpolate==2){
+         mask_weight = mask_weight_3x3;
+      }
+      else{
+         mask_weight = mask_weight_1x1;
+      }
+
+
+      // Gaussian weighting of adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            /** tmp values */
+            uint32_t intensity_comp=0, alpha_comp=0;
+            int ponderation_factor=0;
+
+            // Convolution here
+            for(int cur_px_diff_y=-max_pix_interpolate+1; cur_px_diff_y<max_pix_interpolate; cur_px_diff_y++){
+               int j_conv = ABS(j+cur_px_diff_y);
+               if(j_conv > height-1){
+                  j_conv = height - 1 - ABS(cur_px_diff_y);
+               }
+
+               for(int cur_px_diff_x=-max_pix_interpolate+1; cur_px_diff_x<max_pix_interpolate; cur_px_diff_x++){
+                  int i_conv = ABS(i+cur_px_diff_x);
+                  if(i_conv > width-1){
+                     i_conv = width - 1 - ABS(cur_px_diff_x);
+                  }
+                  int idx_conv = j_conv*width + i_conv;
+                  int weight = mask_weight[ABS(cur_px_diff_y)*max_pix_interpolate+ABS(cur_px_diff_x)];
+
+                  intensity_comp    += img[idx_conv].intensity*weight;
+                  alpha_comp  += img[idx_conv].alpha*weight;
+                  ponderation_factor += weight;
+                 //printf("weight=%d, ponderation_factor=%d, intensity_comp=%d, img[%d].intensity=%d, alpha_comp=%d, img[%d].alpha_comp=%d\n", weight, ponderation_factor, intensity_comp, idx_conv, img[idx_conv].intensity, alpha_comp, idx_conv, img[idx_conv].alpha);
+               }
+            }
+
+            // Weighted values here
+            data[2*idx]     = intensity_comp/ponderation_factor;
+            data[2*idx + 1] = alpha_comp/ponderation_factor;
+            //printf("intensity=data[%d]=%d, alpha=data[%d]=%d\n", 2*idx, data[2*idx], 2*idx + 1, data[2*idx + 1]);
+         }
+      }
+#elif defined(DILATING_FOR_DOWNSCALE_HARCODED_4)
+      
+      // Basic max of 4 adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            int idx_right = j*width + MIN(i+1, width-1);
+            int idx_bot = MIN(j+1, height-1)*width + i;
+            int idx_bot_right = MIN(j+1, height-1)*width + MIN(i+1, width-1);
+            data[2*idx]     = MAX( MAX( MAX(img[idx].intensity, img[idx_right].intensity), img[idx_bot].intensity), img[idx_bot_right].intensity);
+            data[2*idx + 1] = MAX( MAX( MAX(img[idx].alpha, img[idx_right].alpha), img[idx_bot].alpha), img[idx_bot_right].alpha);
+         }
+      }
+#elif defined(DILATING_FOR_DOWNSCALE)
+
+      /// ---- Interpolation params ----
+      int max_pix_interpolate = DILATING_FOR_DOWNSCALE;
+      if(max_pix_interpolate > 5 || max_pix_interpolate<1){
+         printf("ERROR cannot interpolate more than 5x5 px\n");
+         return -1;
+      }
+
+      // Gaussian weighting of adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            /** tmp values */
+            uint8_t intensity_max=0, alpha_max=0;
+
+            // Dilating by finding max value
+            for(int cur_px_diff_y=-max_pix_interpolate+1; cur_px_diff_y<max_pix_interpolate; cur_px_diff_y++){
+               if(j+cur_px_diff_y >= height || j+cur_px_diff_y < 0){
+                  continue;
+               }
+
+               for(int cur_px_diff_x=-max_pix_interpolate+1; cur_px_diff_x<max_pix_interpolate; cur_px_diff_x++){
+                  if(i+cur_px_diff_x >= width || i+cur_px_diff_x < 0){
+                     continue;
+                  }
+                  int idx_conv = (j+cur_px_diff_y)*width + (i+cur_px_diff_x);
+
+                  intensity_max  = MAX(img[idx_conv].intensity,   intensity_max);
+                  alpha_max      = MAX(img[idx_conv].alpha,       alpha_max);
+               }
+            }
+
+            // Weighted values here
+            data[2*idx]     = intensity_max;
+            data[2*idx + 1] = alpha_max;
+         }
+      }
+#elif defined(DILATING_FOR_DOWNSCALE_FORWARD)
+
+      /// ---- Interpolation params ----
+      int max_pix_interpolate = DILATING_FOR_DOWNSCALE_FORWARD;
+      if(max_pix_interpolate > 5 || max_pix_interpolate<1){
+         printf("ERROR cannot interpolate more than 5x5 px\n");
+         return -1;
+      }
+
+      // Gaussian weighting of adjacent pixels for downscaling
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            /** tmp values */
+            uint8_t intensity_max=0, alpha_max=0;
+
+            // Dilating by finding max value (only forward)
+            for(int cur_px_diff_y=0; cur_px_diff_y<max_pix_interpolate; cur_px_diff_y++){
+               if(j+cur_px_diff_y >= height){
+                  continue;
+               }
+
+               for(int cur_px_diff_x=0; cur_px_diff_x<max_pix_interpolate; cur_px_diff_x++){
+                  if(i+cur_px_diff_x >= width){
+                     continue;
+                  }
+                  int idx_conv = (j+cur_px_diff_y)*width + (i+cur_px_diff_x);
+
+                  intensity_max  = MAX(img[idx_conv].intensity,   intensity_max);
+                  alpha_max      = MAX(img[idx_conv].alpha,       alpha_max);
+               }
+            }
+
+            // Weighted values here
+            data[2*idx]     = intensity_max;
+            data[2*idx + 1] = alpha_max;
+         }
+      }
+#else //NO BLUR FOR DOWNSCALE
+
       for (int j = 0; j < height; j++) {
          for (int i = 0; i < width; i++) {
             int idx = j*width + i;
@@ -363,6 +658,20 @@ int ia2png(const char *png_filename, const ia *img, int width, int height)
             data[2*idx + 1] = img[idx].alpha;
          }
       }
+#endif //BLUR FOR DOWNSCALE
+
+
+
+
+
+
+
+
+#ifndef BLUR_FOR_DOWNSCALE
+
+#else //BLUR_FOR_DOWNSCALE
+
+#endif //BLUR_FOR_DOWNSCALE
 
       ret = stbi_write_png(png_filename, width, height, 2, data, 0);
 
@@ -929,7 +1238,7 @@ int main(int argc, char *argv[])
       }
       fclose(bin_fp);
 
-   } else {
+   } else { // MODE_EXPORT
       if (config.width <= 0 || config.height <= 0 || config.format.depth <= 0) {
          ERROR("Error: must set position width and height for export\n");
          return EXIT_FAILURE;
