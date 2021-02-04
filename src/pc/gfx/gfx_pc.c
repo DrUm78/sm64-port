@@ -1854,6 +1854,7 @@ void gfx_run(Gfx *commands) {
 
     if (!gfx_wapi->start_frame()) {
         dropped_frame = true;
+        //printf("dropped_frame\n");
         return;
     }
     dropped_frame = false;

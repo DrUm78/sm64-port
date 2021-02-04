@@ -78,6 +78,12 @@ static int elapsed_time_cnt = 0;
 #define MAX_TOO_SLOW_IN_A_ROW       1
 #define MAX_NORMAL_SPEED_IN_A_ROW   2
 
+// frameskip
+static bool do_render = true;
+static volatile uint32_t tick = 0;
+static uint32_t last = 0;
+static SDL_TimerID idTimer = 0;
+
 // fps stats tracking
 static int f_frames = 0;
 static double f_time = 0.0;
@@ -242,8 +248,18 @@ int test_vsync(void) {
     vsync_enabled = 0;
 }
 
+
+static uint32_t timer_handler(uint32_t interval, void *param)
+{
+    //printf("%s, interval=%d, tick=%d\n", __func__, interval, tick);
+     ++tick;
+    return interval;
+}
+
 static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+    idTimer = SDL_AddTimer(frame_time, timer_handler, NULL);
+    last = tick;
 
     char title[512];
     sprintf(title, "%s (%s)", game_name, GFX_API_NAME);
@@ -321,9 +337,33 @@ static void gfx_sdl_set_keyboard_callbacks(bool (*on_key_down)(int scancode), bo
 }
 
 static void gfx_sdl_main_loop(void (*run_one_game_iter)(void)) {
-    while (1) {
+    const uint32_t now = tick;
+
+    const uint32_t frames = now - last;
+    if (frames) {
+
+        // catch up but skip the first FRAMESKIP frames
+        int skip = (frames > configFrameskip) ? configFrameskip : (frames - 1);
+        for (uint32_t f = 0; f < frames; ++f, --skip) {
+            do_render = (skip <= 0);
+            
+            /*if(!do_render){
+              printf("frameskip! %d missed frames\n", frames-1);
+            }*/
+
+            run_one_game_iter();
+        }
+    }
+    else{
+        do_render = true;
         run_one_game_iter();
     }
+    
+    last = now;
+
+    /*while (1) {
+        run_one_game_iter();
+    }*/
 }
 
 static void gfx_sdl_get_dimensions(uint32_t *width, uint32_t *height) {
@@ -394,18 +434,21 @@ static void gfx_sdl_handle_events(void) {
 }
 
 static bool gfx_sdl_start_frame(void) {
-    return true;
+    //return true;
+    return do_render;
 }
 
 static void sync_framerate_with_timer(void) {
     static Uint32 last_time = 0;
+    //printf("%s\n", __func__);
+
     // get base timestamp on the first frame (might be different from 0)
     if (last_time == 0) last_time = SDL_GetTicks();
     const int elapsed = SDL_GetTicks() - last_time;
     if (elapsed < frame_time){
       SDL_Delay(frame_time - elapsed);
     }
-    last_time += frame_time;
+    last_time = SDL_GetTicks();
     
     elapsed_time_avg += elapsed;
     elapsed_time_cnt++;
@@ -578,6 +621,7 @@ void flip_Upscaling_Bilinear(SDL_Surface *src_surface, SDL_Rect *src_rect, SDL_S
 }
 
 static void gfx_sdl_swap_buffers_begin(void) {
+
     if (!vsync_enabled) {
         sync_framerate_with_timer();
     }
@@ -646,6 +690,8 @@ static double gfx_sdl_get_time(void) {
 static void gfx_sdl_shutdown(void) {
   if(sdl_screen_fullRes){SDL_FreeSurface(sdl_screen_fullRes);}
   if(sdl_screen_halfRes){SDL_FreeSurface(sdl_screen_halfRes);}
+
+  SDL_RemoveTimer(idTimer);
 
   const double elapsed = (SDL_GetTicks() - f_time) / 1000.0;
   printf("\nstats\n");
