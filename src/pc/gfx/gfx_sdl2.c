@@ -143,55 +143,56 @@ const SDLKey scancode_rmapping_nonextended[][2] = {
 };
 
 static void set_halfResScreen(bool on, bool call_callback) {
-  #ifdef ENABLE_SOFTRAST
+#ifdef ENABLE_SOFTRAST
+  printf("%s %s\n", __func__, on?"ON":"OFF");
 
-    half_res = on;
+  half_res = on;
 
-    if (on) {
-        window_width = configScreenWidth/2;
-        window_height = configScreenHeight/2;
-        sdl_screen = sdl_screen_halfRes;
-    } else {
-        window_width = configScreenWidth;
-        window_height = configScreenHeight;
-        sdl_screen = sdl_screen_fullRes;
-    }
-    gfx_output = sdl_screen->pixels;
-    printf("new window_width=%d, new window_height=%d\n", window_width, window_height);
+  if (on) {
+      window_width = configScreenWidth/2;
+      window_height = configScreenHeight/2;
+      sdl_screen = sdl_screen_halfRes;
+  } else {
+      window_width = configScreenWidth;
+      window_height = configScreenHeight;
+      sdl_screen = sdl_screen_fullRes;
+  }
+  gfx_output = sdl_screen->pixels;
+  printf("new window_width=%d, new window_height=%d\n", window_width, window_height);
 
-    if (on_fullscreen_changed_callback != NULL && call_callback) {
-        on_fullscreen_changed_callback(on);
-    }
+  if (on_fullscreen_changed_callback != NULL && call_callback) {
+      on_fullscreen_changed_callback(on);
+  }
 
-  #endif
+#endif
 }
 
 static void set_fullscreen(bool on, bool call_callback) {
-	#ifndef ENABLE_SOFTRAST
-    if (fullscreen_state == on) {
-        return;
-    }
-    fullscreen_state = on;
+  if (fullscreen_state == on) {
+      return;
+  }
+  fullscreen_state = on;
 
-    if (on) {
-        SDL_DisplayMode mode;
-        SDL_GetDesktopDisplayMode(0, &mode);
-        window_width = mode.w;
-        window_height = mode.h;
-    } else {
-        window_width = configScreenWidth;
-        window_height = configScreenHeight;
-    }
-    printf("window_width=%d, window_height=%d\n", window_width, window_height);
-    SDL_SetWindowSize(wnd, window_width, window_height);
-    SDL_SetWindowFullscreen(wnd, on ? SDL_WINDOW_FULLSCREEN : 0);
+#ifndef ENABLE_SOFTRAST
+  if (on) {
+      SDL_DisplayMode mode;
+      SDL_GetDesktopDisplayMode(0, &mode);
+      window_width = mode.w;
+      window_height = mode.h;
+  } else {
+      window_width = configScreenWidth;
+      window_height = configScreenHeight;
+  }
+  //printf("window_width=%d, window_height=%d\n", window_width, window_height);
+  SDL_SetWindowSize(wnd, window_width, window_height);
+  SDL_SetWindowFullscreen(wnd, on ? SDL_WINDOW_FULLSCREEN : 0);
 
-    if (on_fullscreen_changed_callback != NULL && call_callback) {
-        on_fullscreen_changed_callback(on);
-    }
-  #else
-    set_halfResScreen(!on, call_callback);
-  #endif
+  if (on_fullscreen_changed_callback != NULL && call_callback) {
+      on_fullscreen_changed_callback(on);
+  }
+#else
+  //set_halfResScreen(!on, call_callback);
+#endif
 }
 
 int test_vsync(void) {
@@ -376,7 +377,7 @@ static void gfx_sdl_handle_events(void) {
                 if (event.key.keysym.sym == SDLK_k)
                 {
                   printf("%s Half Res\n", half_res?"Disabling":"Enabling");
-                  set_halfResScreen(!half_res, true);
+                  set_fullscreen(!half_res, true);
                 }
 
                 gfx_sdl_onkeydown(event.key.keysym.sym);
@@ -412,7 +413,7 @@ static void sync_framerate_with_timer(void) {
     if(elapsed_time_cnt > MAX_AVG_ELAPSED_TIME_COUNTS){
       elapsed_time_avg /= elapsed_time_cnt;
 
-      int min_frame_time = half_res?(7*frame_time/16):frame_time;
+      int min_frame_time = half_res?(13*frame_time/32):frame_time;
 
       if (elapsed_time_avg < min_frame_time){
         too_slow_in_a_row = 0;
@@ -596,12 +597,22 @@ static void gfx_sdl_swap_buffers_begin(void) {
 
         if(half_res){
           SDL_Rect src_rect_halfRes = {0, 0, configScreenWidth/2, configScreenHeight/2};
+
+          /** Cropped */
           //flip_Upscaling_Bilinear(sdl_screen, &src_rect_halfRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
-          flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_halfRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+          //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_halfRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+
+          /** Stretched */
+          flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_halfRes, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
         } 
         else {
           SDL_Rect src_rect_fullRes = {0, 0, configScreenWidth, configScreenHeight};
-          flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_fullRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+
+          /** Cropped */
+          //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_fullRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+
+          /** Stretched */
+          flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_fullRes, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
         }
 
         //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
@@ -618,12 +629,12 @@ static void gfx_sdl_swap_buffers_begin(void) {
 static void gfx_sdl_swap_buffers_end(void) {
     f_frames++;
 
-    if(normal_speed_in_a_row > MAX_NORMAL_SPEED_IN_A_ROW && half_res){
-      printf("Forcing full res\n");
+    if( (normal_speed_in_a_row > MAX_NORMAL_SPEED_IN_A_ROW || fullscreen_state) && half_res){
+      //printf("Forcing full res\n");
       set_halfResScreen(false, true);
     }
-    else if(too_slow_in_a_row > MAX_TOO_SLOW_IN_A_ROW && !half_res){
-      printf("Forcing half res\n");
+    else if(too_slow_in_a_row > MAX_TOO_SLOW_IN_A_ROW && !half_res && !fullscreen_state){
+      //printf("Forcing half res\n");
       set_halfResScreen(true, true);
     }
 }

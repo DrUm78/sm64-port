@@ -186,6 +186,8 @@ static float inv_ratio_y = 1.f;
 
 static bool dropped_frame;
 
+bool text_rendered = false;
+
 static float buf_vbo[MAX_BUFFERED * (26 * 3)]; // 3 vertices in a triangle and 26 floats per vtx
 static size_t buf_vbo_len;
 static size_t buf_vbo_num_tris;
@@ -1842,6 +1844,7 @@ void gfx_start_frame(void) {
     inv_ratio_x = (float)SCREEN_WIDTH / (float)gfx_current_dimensions.width;
     inv_ratio_y = (float)SCREEN_HEIGHT / (float)gfx_current_dimensions.height;
     gfx_current_dimensions.aspect_ratio = (float)gfx_current_dimensions.width / (float)gfx_current_dimensions.height;
+    text_rendered = false;
 }
 
 void gfx_run(Gfx *commands) {
@@ -1865,6 +1868,10 @@ void gfx_run(Gfx *commands) {
 void gfx_end_frame(void) {
     if (!dropped_frame) {
         gfx_rapi->finish_render();
+
+#ifdef FUNKEY
+        gfx_wapi->set_fullscreen(text_rendered);
+#endif
         gfx_wapi->swap_buffers_end();
     }
 }

@@ -30,7 +30,7 @@ struct ConfigOption {
 /*
  *Config options and default values
  */
-bool configFullscreen            = false;
+bool configFullscreen            = true;
 bool configDrawSky               = true;
 bool configFiltering             = false;
 bool configEnableSound           = true;
@@ -39,8 +39,8 @@ bool configEnableFog             = false;
 unsigned int configScreenWidth   = 80;
 unsigned int configScreenHeight  = 60;
 #elif defined(FUNKEY)
-unsigned int configScreenWidth   = 160; //210;
-unsigned int configScreenHeight  = 120; //160;
+unsigned int configScreenWidth   = 320;
+unsigned int configScreenHeight  = 240;
 #else
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;

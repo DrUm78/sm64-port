@@ -319,12 +319,12 @@ int i2raw(uint8_t *raw, const ia *img, int width, int height, int depth)
    return size;
 }
 
-//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4
-//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_9
-//#define BLUR_FOR_DOWNSCALE_GAUSSIAN 2
-//#define DILATING_FOR_DOWNSCALE_HARCODED_4
-//#define DILATING_FOR_DOWNSCALE 2
-//#define DILATING_FOR_DOWNSCALE_FORWARD 2
+//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4    //not good
+//#define BLUR_FOR_DOWNSCALE_AVG_HARDCODED_9    //not good
+//#define BLUR_FOR_DOWNSCALE_GAUSSIAN 2         //not good
+//#define DILATING_FOR_DOWNSCALE_HARCODED_3     //not bad
+//#define DILATING_FOR_DOWNSCALE 2              // too much
+//#define DILATING_FOR_DOWNSCALE_FORWARD 2      // not bad
 
 //---------------------------------------------------------
 // internal RGBA/IA -> PNG
@@ -338,6 +338,8 @@ int rgba2png(const char *png_filename, const rgba *img, int width, int height)
    // convert to format stb_image_write expects
    uint8_t *data = malloc(4*width*height);
    if (data) {
+#if 0
+
 #if defined(BLUR_FOR_DOWNSCALE_AVG_HARDCODED_4)
       
       // Basic avg of adjacent pixels for downscaling from 320x240 to 160x120
@@ -431,6 +433,17 @@ int rgba2png(const char *png_filename, const rgba *img, int width, int height)
          }
       }
 #endif //BLUR FOR DOWNSCALE
+
+#endif //0
+      for (int j = 0; j < height; j++) {
+         for (int i = 0; i < width; i++) {
+            int idx = j*width + i;
+            data[4*idx]     = img[idx].red;
+            data[4*idx + 1] = img[idx].green;
+            data[4*idx + 2] = img[idx].blue;
+            data[4*idx + 3] = img[idx].alpha;
+         }
+      }
 
       ret = stbi_write_png(png_filename, width, height, 4, data, 0);
 
@@ -560,7 +573,7 @@ int ia2png(const char *png_filename, const ia *img, int width, int height)
             //printf("intensity=data[%d]=%d, alpha=data[%d]=%d\n", 2*idx, data[2*idx], 2*idx + 1, data[2*idx + 1]);
          }
       }
-#elif defined(DILATING_FOR_DOWNSCALE_HARCODED_4)
+#elif defined(DILATING_FOR_DOWNSCALE_HARCODED_3)
       
       // Basic max of 4 adjacent pixels for downscaling
       for (int j = 0; j < height; j++) {
@@ -568,9 +581,8 @@ int ia2png(const char *png_filename, const ia *img, int width, int height)
             int idx = j*width + i;
             int idx_right = j*width + MIN(i+1, width-1);
             int idx_bot = MIN(j+1, height-1)*width + i;
-            int idx_bot_right = MIN(j+1, height-1)*width + MIN(i+1, width-1);
-            data[2*idx]     = MAX( MAX( MAX(img[idx].intensity, img[idx_right].intensity), img[idx_bot].intensity), img[idx_bot_right].intensity);
-            data[2*idx + 1] = MAX( MAX( MAX(img[idx].alpha, img[idx_right].alpha), img[idx_bot].alpha), img[idx_bot_right].alpha);
+            data[2*idx]     = MAX( MAX(img[idx].intensity, img[idx_right].intensity), img[idx_bot].intensity);
+            data[2*idx + 1] = MAX( MAX(img[idx].alpha, img[idx_right].alpha), img[idx_bot].alpha);
          }
       }
 #elif defined(DILATING_FOR_DOWNSCALE)
