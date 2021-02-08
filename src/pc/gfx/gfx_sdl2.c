@@ -52,6 +52,9 @@
 // Halves
 #define Weight1_1(A, B)   (Half(A) + Half(B) + Corr1_1(A, B))
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 
 
 ///------ Definition of the different aspect ratios
@@ -81,8 +84,6 @@ static int aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
 #include "gfx_soft.h"
 //static SDL_Renderer *renderer;
 SDL_Surface *sdl_screen = NULL;
-static SDL_Surface *sdl_screen_fullRes = NULL;
-static SDL_Surface *sdl_screen_halfRes = NULL;
 SDL_PixelFormat sdl_screen_bgr;
 static SDL_Surface *buffer = NULL;
 static SDL_Surface *texture = NULL;
@@ -91,27 +92,34 @@ static SDL_Surface *texture = NULL;
 #define GFX_API_NAME "SDL2 - OpenGL"
 #endif
 
-//static SDL_Window *wnd;
-static int inverted_scancode_table[512];
-static int vsync_enabled = 0;
-static unsigned int window_width = DESIRED_SCREEN_WIDTH;
-static unsigned int window_height = DESIRED_SCREEN_HEIGHT;
+// Handling subresolutions 
+#define SUB_RES_DIVIDER  6     //1 is just fullscreen
+#define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
+static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS];
+static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
 static bool fullscreen_state;
-static void (*on_fullscreen_changed_callback)(bool is_now_fullscreen);
-static bool (*on_key_down_callback)(int scancode);
-static bool (*on_key_up_callback)(int scancode);
-static void (*on_all_keys_up_callback)(void);
-static bool half_res = false;
+//static bool half_res = false;
+static int current_res_idx = 0;
 
-// time between consequtive game frames
+// time between consecutive game frames
 const int frame_time = 1000 / FRAMERATE;
 static int too_slow_in_a_row = 0;
 static int normal_speed_in_a_row = 0;
 static int elapsed_time_avg = 0;
 static int elapsed_time_cnt = 0;
 #define MAX_AVG_ELAPSED_TIME_COUNTS 10
-#define MAX_TOO_SLOW_IN_A_ROW       1
+#define MAX_TOO_SLOW_IN_A_ROW       2
 #define MAX_NORMAL_SPEED_IN_A_ROW   2
+
+//static SDL_Window *wnd;
+static int inverted_scancode_table[512];
+static int vsync_enabled = 0;
+static unsigned int window_width = DESIRED_SCREEN_WIDTH;
+static unsigned int window_height = DESIRED_SCREEN_HEIGHT;
+static void (*on_fullscreen_changed_callback)(bool is_now_fullscreen);
+static bool (*on_key_down_callback)(int scancode);
+static bool (*on_key_up_callback)(int scancode);
+static void (*on_all_keys_up_callback)(void);
 
 // frameskip
 static bool do_render = true;
@@ -183,28 +191,37 @@ const SDLKey scancode_rmapping_nonextended[][2] = {
     {SDLK_DOWN, SDLK_DOWN},
 };
 
-static void set_halfResScreen(bool on, bool call_callback) {
+static void set_higherRes(bool call_callback) {
 #ifdef ENABLE_SOFTRAST
-  //printf("%s %s\n", __func__, on?"ON":"OFF");
+  //printf("%s\n", __func__);
 
-  half_res = on;
-
-  if (on) {
-      window_width = configScreenWidth/2;
-      window_height = configScreenHeight/2;
-      sdl_screen = sdl_screen_halfRes;
-  } else {
-      window_width = configScreenWidth;
-      window_height = configScreenHeight;
-      sdl_screen = sdl_screen_fullRes;
-  }
+  current_res_idx = (current_res_idx>0)?(current_res_idx-1):0;
+  window_width = resolutions[current_res_idx].w;
+  window_height = resolutions[current_res_idx].h;
+  sdl_screen = sdl_screen_subRes[current_res_idx];
   gfx_output = sdl_screen->pixels;
-  //printf("new window_width=%d, new window_height=%d\n", window_width, window_height);
+  printf("New higher resolution: %dx%d\n", window_width, window_height);
 
   if (on_fullscreen_changed_callback != NULL && call_callback) {
-      on_fullscreen_changed_callback(on);
+      on_fullscreen_changed_callback(true);
   }
+#endif
+}
 
+static void set_lowerRes(bool call_callback) {
+#ifdef ENABLE_SOFTRAST
+  printf("%s\n", __func__);
+
+  current_res_idx = (current_res_idx<(NB_SUBRESOLUTIONS-1))?(current_res_idx+1):NB_SUBRESOLUTIONS-1;
+  window_width = resolutions[current_res_idx].w;
+  window_height = resolutions[current_res_idx].h;
+  sdl_screen = sdl_screen_subRes[current_res_idx];
+  gfx_output = sdl_screen->pixels;
+  printf("New Lower resolution: %dx%d\n", window_width, window_height);
+
+  if (on_fullscreen_changed_callback != NULL && call_callback) {
+      on_fullscreen_changed_callback(true);
+  }
 #endif
 }
 
@@ -311,9 +328,21 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     	sdl_screen = SDL_SetVideoMode(window_width, window_height, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
     #else
     	texture = SDL_SetVideoMode(240, 240, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
-    	sdl_screen_fullRes = SDL_CreateRGBSurface(SDL_SWSURFACE, window_width, window_height, 32, 0,0,0,0);
-      sdl_screen_halfRes = SDL_CreateRGBSurface(SDL_SWSURFACE, window_width/2, window_height/2, 32, 0,0,0,0);
-      set_halfResScreen(!start_in_fullscreen, false);
+
+
+      int dividend = (1 << (SUB_RES_DIVIDER-1)); 
+      for(int i=0; i < NB_SUBRESOLUTIONS; i++){
+        int factor = dividend-i;
+        printf("NB_SUBRESOLUTIONS=%d, i=%d, factor=%d, dividend=%d\n",NB_SUBRESOLUTIONS, i, factor, dividend);
+        resolutions[i].w = window_width*factor/dividend;
+        resolutions[i].h = window_height*factor/dividend;
+        sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 32, 0,0,0,0);  
+        printf("Creating surface for sub resolution[%d]: %dx%d \n", i, resolutions[i].w, resolutions[i].h);
+      }
+      
+      //set_halfResScreen(!start_in_fullscreen, false);
+      current_res_idx = 0;
+      sdl_screen = sdl_screen_subRes[current_res_idx];
     #endif
   #endif
 	#ifdef SDL_SURFACE
@@ -495,17 +524,27 @@ static void sync_framerate_with_timer(void) {
     if(elapsed_time_cnt > MAX_AVG_ELAPSED_TIME_COUNTS){
       elapsed_time_avg /= elapsed_time_cnt;
 
-      int min_frame_time = half_res?(13*frame_time/32):frame_time;
+      //int min_frame_time = half_res?(13*frame_time/32):frame_time;
+      int dividend = (1 << (SUB_RES_DIVIDER-1) );
+      int factor = dividend/2;
+      int min_frame_time = frame_time - current_res_idx*frame_time/(2*NB_SUBRESOLUTIONS);
+      int max_frame_time = frame_time;
 
       if (elapsed_time_avg < min_frame_time){
         too_slow_in_a_row = 0;
         normal_speed_in_a_row++;
-        //printf("speed %d\n", normal_speed_in_a_row);
+        printf("speed %d, fraction=%d/%d, elapsed_time_avg=%d, min_frame_time=%d, frametime=%d\n", 
+              normal_speed_in_a_row, factor, dividend, elapsed_time_avg, min_frame_time, frame_time);
       }
-      else{
+      else if(elapsed_time_avg > max_frame_time){
         too_slow_in_a_row++;
         normal_speed_in_a_row = 0;
-        //printf("slow %d\n", too_slow_in_a_row);
+        printf("slow %d, fraction=%d/%d, elapsed_time_avg=%d, min_frame_time=%d, frametime=%d\n", 
+              too_slow_in_a_row, factor, dividend, elapsed_time_avg, min_frame_time, frame_time);
+      }
+      else{
+        too_slow_in_a_row=0;
+        normal_speed_in_a_row = 0;
       }
 
       elapsed_time_cnt = 0;
@@ -897,49 +936,34 @@ static void gfx_sdl_swap_buffers_begin(void) {
     	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
     #endif*/
 
-        if(half_res){
-          SDL_Rect src_rect_halfRes = {0, 0, configScreenWidth/2, configScreenHeight/2};
 
-          /** Cropped */
-          if(aspect_ratio == ASPECT_RATIOS_TYPE_CROPPED){
-            if(configScreenWidth==320 && configScreenHeight==240){
-              upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
-            }
-            else{
-              flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_halfRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
-            }
-          }
-          else{ /** Stretched */
-            if(configScreenWidth==320 && configScreenHeight==240){
-              upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
-            }
-            else{
-              flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_halfRes, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
-            }
-          }
-        } 
-        else { // Full Resolution
-          SDL_Rect src_rect_fullRes = {0, 0, configScreenWidth, configScreenHeight};
+    /** Cropped */
+    if(aspect_ratio == ASPECT_RATIOS_TYPE_CROPPED){
+      if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+        upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
+      }
+      else{
+        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+      }
+    }
+    else{ /** Stretched */
+      if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+        upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
+      }
+      else if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
+        downscale_320x240_to_240x240_bilinearish(sdl_screen, texture);
+      }
+      else{
+        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
+      }
+    }
+    
 
-          /** Cropped */
-          if(aspect_ratio == ASPECT_RATIOS_TYPE_CROPPED){
-            flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_fullRes, texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
-          }
-          else{ /** Stretched */
-            if(configScreenWidth==320 && configScreenHeight==240){
-              downscale_320x240_to_240x240_bilinearish(sdl_screen, texture);
-            }
-            else{
-              flip_NNOptimized_AllowOutOfScreen(sdl_screen, &src_rect_fullRes, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
-            }
-          }
-        }
-
-        //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
-        //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);
-        //SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-    	
-        SDL_Flip(texture);
+    //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
+    //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);
+    //SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
+	
+    SDL_Flip(texture);
 #endif
 #else
     SDL_GL_SwapWindow(wnd);
@@ -949,13 +973,20 @@ static void gfx_sdl_swap_buffers_begin(void) {
 static void gfx_sdl_swap_buffers_end(void) {
     f_frames++;
 
-    if( (normal_speed_in_a_row > MAX_NORMAL_SPEED_IN_A_ROW || fullscreen_state) && half_res){
-      //printf("Forcing full res\n");
-      set_halfResScreen(false, true);
-    }
-    else if(too_slow_in_a_row > MAX_TOO_SLOW_IN_A_ROW && !half_res && !fullscreen_state){
-      //printf("Forcing half res\n");
-      set_halfResScreen(true, true);
+    if(NB_SUBRESOLUTIONS > 1){
+        if( (normal_speed_in_a_row >= MAX_NORMAL_SPEED_IN_A_ROW || fullscreen_state) && current_res_idx != 0){
+          //printf("Forcing full res\n");
+          if(fullscreen_state){
+            current_res_idx = 0;
+          }
+          normal_speed_in_a_row = 0;
+          set_higherRes(true);
+        }
+        else if(too_slow_in_a_row >= MAX_TOO_SLOW_IN_A_ROW && !fullscreen_state && (current_res_idx < NB_SUBRESOLUTIONS-1) ){
+          //printf("Forcing half res\n");
+          too_slow_in_a_row = 0;
+          set_lowerRes(true);
+        }
     }
 }
 
@@ -964,8 +995,9 @@ static double gfx_sdl_get_time(void) {
 }
 
 static void gfx_sdl_shutdown(void) {
-  if(sdl_screen_fullRes){SDL_FreeSurface(sdl_screen_fullRes);}
-  if(sdl_screen_halfRes){SDL_FreeSurface(sdl_screen_halfRes);}
+  for(int i=0; i<NB_SUBRESOLUTIONS; i++){
+    if(sdl_screen_subRes[i]){SDL_FreeSurface(sdl_screen_subRes[i]);}
+  }
 
   SDL_RemoveTimer(idTimer);
 
