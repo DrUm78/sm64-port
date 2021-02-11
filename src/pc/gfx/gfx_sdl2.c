@@ -233,8 +233,7 @@ static void set_lowerRes(bool dichotomic, bool call_callback) {
     current_res_idx = (current_res_idx<(NB_SUBRESOLUTIONS-1))?(current_res_idx+1):NB_SUBRESOLUTIONS-1;
   }
   else{   /** Dichotomic */
-    //current_res_idx = (NB_SUBRESOLUTIONS-1) - ((NB_SUBRESOLUTIONS-1)-current_res_idx)/2;
-    current_res_idx = ((NB_SUBRESOLUTIONS-1) + current_res_idx)/2;
+    current_res_idx = (NB_SUBRESOLUTIONS-1) - ((NB_SUBRESOLUTIONS-1)-current_res_idx)/2; // do not factorize or it won't be the same res because of integer fractions
   }
 
   window_width = resolutions[current_res_idx].w;
@@ -549,10 +548,8 @@ static void sync_framerate_with_timer(void) {
     if(elapsed_time_cnt > MAX_AVG_ELAPSED_TIME_COUNTS){
       elapsed_time_avg /= elapsed_time_cnt;
 
-      /*int dividend = (1 << (SUB_RES_DIVIDER-1) );
-      int factor = dividend/2;*/
       int interval = frame_time/(NB_SUBRESOLUTIONS)+1;
-      int min_frame_time = frame_time - frame_time/(NB_SUBRESOLUTIONS)*interval - 1;
+      int min_frame_time = frame_time - current_res_idx*(frame_time/2)/NB_SUBRESOLUTIONS - 1;
       int max_frame_time = frame_time;
 
       if (elapsed_time_avg < min_frame_time && current_res_idx!= 0){
