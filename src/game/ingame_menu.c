@@ -23,6 +23,13 @@
 #include "text_strings.h"
 #include "types.h"
 
+//#define DEBUG_TEXT
+#ifdef DEBUG_TEXT
+#define DEBUG_TEXT_PRINTF(...)   printf(__VA_ARGS__);
+#else
+#define DEBUG_TEXT_PRINTF(...)
+#endif // DEBUG
+
 u16 gDialogColorFadeTimer;
 s8 gLastDialogLineNum;
 s32 gDialogVariable;
@@ -228,7 +235,7 @@ static u8 *alloc_ia8_text_from_i1(u16 *in, s16 width, s16 height) {
 }
 
 void render_generic_char(u8 c) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
 
     void **fontLUT;
@@ -288,7 +295,7 @@ u8 *alloc_ia4_tex_from_i1(u8 *in, s16 width, s16 height) {
 }
 
 void render_generic_char_at_pos(s16 xPos, s16 yPos, u8 c) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     void **fontLUT;
@@ -516,8 +523,8 @@ void print_generic_string(s16 x, s16 y, const u8 *str) {
 
 #ifdef VERSION_EU
 void print_hud_char_umlaut(s16 x, s16 y, u8 chr) {
-    //printf("%s\n", __func__);
-    text_rendered = true;
+    //DEBUG_TEXT_PRINTF("%s\n", __func__);
+    //text_rendered = true;
     
     void **fontLUT = segmented_to_virtual(main_hud_lut);
 
@@ -536,8 +543,8 @@ void print_hud_char_umlaut(s16 x, s16 y, u8 chr) {
  * Prints a hud string depending of the hud table list defined.
  */
 void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
-    //printf("%s\n", __func__);
-    text_rendered = true;
+    //DEBUG_TEXT_PRINTF("%s\n", __func__);
+    //text_rendered = true;
     
     s32 strPos = 0;
     void **hudLUT1 = segmented_to_virtual(menu_hud_lut); // Japanese Menu HUD Color font
@@ -612,7 +619,7 @@ void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
 
 #ifdef VERSION_EU
 void print_menu_char_umlaut(s16 x, s16 y, u8 chr) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     void **fontLUT = segmented_to_virtual(menu_font_lut);
@@ -630,7 +637,7 @@ void print_menu_char_umlaut(s16 x, s16 y, u8 chr) {
 #endif
 
 void print_menu_generic_string(s16 x, s16 y, const u8 *str) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     UNUSED s8 mark = DIALOG_MARK_NONE; // unused in EU
@@ -694,7 +701,7 @@ void print_menu_generic_string(s16 x, s16 y, const u8 *str) {
 }
 
 void print_credits_string(s16 x, s16 y, const u8 *str) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     s32 strPos = 0;
@@ -1018,7 +1025,7 @@ void change_and_flash_dialog_text_color_lines(s8 colorMode, s8 lineNum) {
 
 #ifdef VERSION_EU
 void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y, u8 c) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     s16 width;
@@ -1219,7 +1226,7 @@ void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog)
 void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog, s8 lowerBound)
 #endif
 {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     UNUSED s32 pad[2];
@@ -1696,7 +1703,7 @@ s8 gDialogCourseActNum = 1;
 #endif
 
 void render_dialog_entries(void) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
 #ifdef VERSION_EU
@@ -2031,7 +2038,7 @@ void do_cutscene_handler(void) {
 
 // "Dear Mario" message handler
 void print_peach_letter_message(void) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
     void **dialogTable;
@@ -2223,7 +2230,7 @@ u8 gTextCourseArr[][7] = {
 #endif
 
 void render_pause_my_score_coins(void) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
 #ifdef VERSION_EU
@@ -2538,7 +2545,7 @@ void render_pause_castle_course_stars(s16 x, s16 y, s16 fileNum, s16 courseNum) 
 }
 
 void render_pause_castle_main_strings(s16 x, s16 y) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
 #ifdef VERSION_EU
@@ -2843,7 +2850,7 @@ void play_star_fanfare_and_flash_hud(s32 arg, u8 starNum) {
 #endif
 
 void render_course_complete_lvl_info_and_hud_str(void) {
-    //printf("%s\n", __func__);
+    DEBUG_TEXT_PRINTF("%s\n", __func__);
     text_rendered = true;
     
 #if defined(VERSION_JP) || defined(VERSION_SH)
