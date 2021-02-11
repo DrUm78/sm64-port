@@ -28,6 +28,13 @@
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
 
+//#define DEBUG_ADAPTATIVE_RES
+#ifdef DEBUG_ADAPTATIVE_RES
+#define DEBUG_ADAPTATIVE_RES_PRINTF(...)   printf(__VA_ARGS__);
+#else
+#define DEBUG_ADAPTATIVE_RES_PRINTF(...)
+#endif // DEBUG
+
 #define RES_HW_SCREEN_HORIZONTAL    240
 #define RES_HW_SCREEN_VERTICAL      240
 
@@ -104,12 +111,13 @@ static int current_res_idx = 0;
 // time between consecutive game frames
 const int frame_time = 1000 / FRAMERATE;
 static int too_slow_in_a_row = 0;
-static int normal_speed_in_a_row = 0;
+static int fast_speed_in_a_row = 0;
 static int elapsed_time_avg = 0;
 static int elapsed_time_cnt = 0;
-#define MAX_AVG_ELAPSED_TIME_COUNTS 10
-#define MAX_TOO_SLOW_IN_A_ROW       2
-#define MAX_NORMAL_SPEED_IN_A_ROW   2
+static bool dichotomic_res_change = true;
+#define MAX_AVG_ELAPSED_TIME_COUNTS 3
+#define MAX_TOO_SLOW_IN_A_ROW       3
+#define MAX_FAST_SPEED_IN_A_ROW   3
 
 //static SDL_Window *wnd;
 static int inverted_scancode_table[512];
@@ -191,16 +199,24 @@ const SDLKey scancode_rmapping_nonextended[][2] = {
     {SDLK_DOWN, SDLK_DOWN},
 };
 
-static void set_higherRes(bool call_callback) {
+static void set_higherRes(bool dichotomic, bool call_callback) {
 #ifdef ENABLE_SOFTRAST
   //printf("%s\n", __func__);
-
-  current_res_idx = (current_res_idx>0)?(current_res_idx-1):0;
+  
+  /** Linear */
+  if(!dichotomic){
+    current_res_idx = (current_res_idx>0)?(current_res_idx-1):0;
+  }
+  else{   /** Dichotomic */
+    current_res_idx = current_res_idx/2;
+  }  
+  
   window_width = resolutions[current_res_idx].w;
   window_height = resolutions[current_res_idx].h;
   sdl_screen = sdl_screen_subRes[current_res_idx];
   gfx_output = sdl_screen->pixels;
-  printf("New higher resolution: %dx%d\n", window_width, window_height);
+  DEBUG_ADAPTATIVE_RES_PRINTF("Set higher resolution %s (idx %d/%d): %dx%d\n", 
+    dichotomic?"dichotomic":"linear", current_res_idx, (NB_SUBRESOLUTIONS-1), window_width, window_height);
 
   if (on_fullscreen_changed_callback != NULL && call_callback) {
       on_fullscreen_changed_callback(true);
@@ -208,16 +224,25 @@ static void set_higherRes(bool call_callback) {
 #endif
 }
 
-static void set_lowerRes(bool call_callback) {
+static void set_lowerRes(bool dichotomic, bool call_callback) {
 #ifdef ENABLE_SOFTRAST
-  printf("%s\n", __func__);
+  //printf("%s\n", __func__);
 
-  current_res_idx = (current_res_idx<(NB_SUBRESOLUTIONS-1))?(current_res_idx+1):NB_SUBRESOLUTIONS-1;
+  /** Linear */
+  if(!dichotomic){
+    current_res_idx = (current_res_idx<(NB_SUBRESOLUTIONS-1))?(current_res_idx+1):NB_SUBRESOLUTIONS-1;
+  }
+  else{   /** Dichotomic */
+    //current_res_idx = (NB_SUBRESOLUTIONS-1) - ((NB_SUBRESOLUTIONS-1)-current_res_idx)/2;
+    current_res_idx = ((NB_SUBRESOLUTIONS-1) + current_res_idx)/2;
+  }
+
   window_width = resolutions[current_res_idx].w;
   window_height = resolutions[current_res_idx].h;
   sdl_screen = sdl_screen_subRes[current_res_idx];
   gfx_output = sdl_screen->pixels;
-  printf("New Lower resolution: %dx%d\n", window_width, window_height);
+  DEBUG_ADAPTATIVE_RES_PRINTF("Set Lower resolution %s (idx %d/%d): %dx%d\n", 
+    dichotomic?"dichotomic":"linear", current_res_idx, (NB_SUBRESOLUTIONS-1), window_width, window_height);
 
   if (on_fullscreen_changed_callback != NULL && call_callback) {
       on_fullscreen_changed_callback(true);
@@ -333,11 +358,11 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       int dividend = (1 << (SUB_RES_DIVIDER-1)); 
       for(int i=0; i < NB_SUBRESOLUTIONS; i++){
         int factor = dividend-i;
-        printf("NB_SUBRESOLUTIONS=%d, i=%d, factor=%d, dividend=%d\n",NB_SUBRESOLUTIONS, i, factor, dividend);
+        DEBUG_ADAPTATIVE_RES_PRINTF("NB_SUBRESOLUTIONS=%d, i=%d, factor=%d, dividend=%d\n",NB_SUBRESOLUTIONS, i, factor, dividend);
         resolutions[i].w = window_width*factor/dividend;
         resolutions[i].h = window_height*factor/dividend;
         sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 32, 0,0,0,0);  
-        printf("Creating surface for sub resolution[%d]: %dx%d \n", i, resolutions[i].w, resolutions[i].h);
+        DEBUG_ADAPTATIVE_RES_PRINTF("Creating surface for sub resolution[%d]: %dx%d \n", i, resolutions[i].w, resolutions[i].h);
       }
       
       //set_halfResScreen(!start_in_fullscreen, false);
@@ -524,27 +549,29 @@ static void sync_framerate_with_timer(void) {
     if(elapsed_time_cnt > MAX_AVG_ELAPSED_TIME_COUNTS){
       elapsed_time_avg /= elapsed_time_cnt;
 
-      //int min_frame_time = half_res?(13*frame_time/32):frame_time;
-      int dividend = (1 << (SUB_RES_DIVIDER-1) );
-      int factor = dividend/2;
-      int min_frame_time = frame_time - current_res_idx*frame_time/(2*NB_SUBRESOLUTIONS);
+      /*int dividend = (1 << (SUB_RES_DIVIDER-1) );
+      int factor = dividend/2;*/
+      int interval = frame_time/(NB_SUBRESOLUTIONS)+1;
+      int min_frame_time = frame_time - frame_time/(NB_SUBRESOLUTIONS)*interval - 1;
       int max_frame_time = frame_time;
 
-      if (elapsed_time_avg < min_frame_time){
+      if (elapsed_time_avg < min_frame_time && current_res_idx!= 0){
         too_slow_in_a_row = 0;
-        normal_speed_in_a_row++;
-        printf("speed %d, fraction=%d/%d, elapsed_time_avg=%d, min_frame_time=%d, frametime=%d\n", 
-              normal_speed_in_a_row, factor, dividend, elapsed_time_avg, min_frame_time, frame_time);
+        fast_speed_in_a_row++;
+        dichotomic_res_change = (elapsed_time_avg < min_frame_time - interval)?true:false;
+        DEBUG_ADAPTATIVE_RES_PRINTF("speed %d, elapsed_time_avg=%d, min_frame_time=%d, interval=%d, frametime=%d\n", 
+              fast_speed_in_a_row, elapsed_time_avg, min_frame_time, interval, frame_time);
       }
       else if(elapsed_time_avg > max_frame_time){
         too_slow_in_a_row++;
-        normal_speed_in_a_row = 0;
-        printf("slow %d, fraction=%d/%d, elapsed_time_avg=%d, min_frame_time=%d, frametime=%d\n", 
-              too_slow_in_a_row, factor, dividend, elapsed_time_avg, min_frame_time, frame_time);
+        fast_speed_in_a_row = 0;
+        dichotomic_res_change = (elapsed_time_avg > max_frame_time + interval)?true:false;
+        DEBUG_ADAPTATIVE_RES_PRINTF("slow %d, elapsed_time_avg=%d, min_frame_time=%d, interval=%d, frametime=%d\n", 
+              too_slow_in_a_row, elapsed_time_avg, min_frame_time, interval, frame_time);
       }
       else{
         too_slow_in_a_row=0;
-        normal_speed_in_a_row = 0;
+        fast_speed_in_a_row = 0;
       }
 
       elapsed_time_cnt = 0;
@@ -974,18 +1001,21 @@ static void gfx_sdl_swap_buffers_end(void) {
     f_frames++;
 
     if(NB_SUBRESOLUTIONS > 1){
-        if( (normal_speed_in_a_row >= MAX_NORMAL_SPEED_IN_A_ROW || fullscreen_state) && current_res_idx != 0){
-          //printf("Forcing full res\n");
+        if( (fast_speed_in_a_row >= MAX_FAST_SPEED_IN_A_ROW || fullscreen_state) && current_res_idx != 0){
+          
+          /** Forcing full resolution */
           if(fullscreen_state){
+            DEBUG_ADAPTATIVE_RES_PRINTF("Forcing full res (text displayed)\n");
             current_res_idx = 0;
           }
-          normal_speed_in_a_row = 0;
-          set_higherRes(true);
+
+          fast_speed_in_a_row = 0;
+          set_higherRes(dichotomic_res_change, true);
         }
         else if(too_slow_in_a_row >= MAX_TOO_SLOW_IN_A_ROW && !fullscreen_state && (current_res_idx < NB_SUBRESOLUTIONS-1) ){
-          //printf("Forcing half res\n");
+          
           too_slow_in_a_row = 0;
-          set_lowerRes(true);
+          set_lowerRes(dichotomic_res_change, true);
         }
     }
 }
