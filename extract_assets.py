@@ -149,8 +149,9 @@ def main():
                 + sha1
                 + ", expected "
                 + expected_sha1
+                + ". Results might be unexpected."
             )
-            sys.exit(1)
+            #sys.exit(1)
 
     make = "make"
 
