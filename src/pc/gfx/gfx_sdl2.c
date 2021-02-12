@@ -15,6 +15,7 @@
 #include "SDL_opengl.h"
 #else
 #include <SDL/SDL.h>
+#include <SDL/SDL_ttf.h>
 /*#define GL_GLEXT_PROTOTYPES 1
 #ifdef ENABLE_OPENGL_LEGACY
 #include <SDL2/SDL_opengl.h>
@@ -27,6 +28,7 @@
 #include "../configfile.h"
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
+#include "gfx_sdl_menu.h"
 
 //#define DEBUG_ADAPTATIVE_RES
 #ifdef DEBUG_ADAPTATIVE_RES
@@ -34,9 +36,6 @@
 #else
 #define DEBUG_ADAPTATIVE_RES_PRINTF(...)
 #endif // DEBUG
-
-#define RES_HW_SCREEN_HORIZONTAL    240
-#define RES_HW_SCREEN_VERTICAL      240
 
 // Support math
 #define Half(A) (((A) >> 1) & 0x7F7F7F7F)
@@ -63,19 +62,6 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 
-
-///------ Definition of the different aspect ratios
-#define ASPECT_RATIOS \
-    X(ASPECT_RATIOS_TYPE_STRETCHED, "STRETCHED") \
-    X(ASPECT_RATIOS_TYPE_CROPPED, "CROPPED") \
-    X(NB_ASPECT_RATIOS_TYPES, "")
-
-////------ Enumeration of the different aspect ratios ------
-#undef X
-#define X(a, b) a,
-typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
-static int aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
-
 #if defined(VERSION_EU)
 # define FRAMERATE 25
 #else
@@ -93,7 +79,7 @@ static int aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
 SDL_Surface *sdl_screen = NULL;
 SDL_PixelFormat sdl_screen_bgr;
 static SDL_Surface *buffer = NULL;
-static SDL_Surface *texture = NULL;
+SDL_Surface *texture = NULL;
 //static SDL_Texture *texture = NULL;
 #else
 #define GFX_API_NAME "SDL2 - OpenGL"
@@ -134,6 +120,7 @@ static bool do_render = true;
 static volatile uint32_t tick = 0;
 static uint32_t last = 0;
 static SDL_TimerID idTimer = 0;
+static Uint32 last_time = 0;
 
 // fps stats tracking
 static int f_frames = 0;
@@ -333,7 +320,14 @@ static uint32_t timer_handler(uint32_t interval, void *param)
 }
 
 static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
+    
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+    
+    if(TTF_Init()==-1) {
+      printf("ERROR TTF_Init: %s\n", TTF_GetError());
+      game_exit();
+    }
+
     idTimer = SDL_AddTimer(frame_time, timer_handler, NULL);
     last = tick;
 
@@ -367,6 +361,8 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       //set_halfResScreen(!start_in_fullscreen, false);
       current_res_idx = 0;
       sdl_screen = sdl_screen_subRes[current_res_idx];
+
+      init_menu_SDL();
     #endif
   #endif
 	#ifdef SDL_SURFACE
@@ -496,20 +492,20 @@ static void gfx_sdl_handle_events(void) {
 #ifndef TARGET_WEB
             // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
             case SDL_KEYDOWN:
-        				if (event.key.keysym.sym == SDLK_q)
-        				{
-        					game_exit();
-        				}
+                switch(event.key.keysym.sym){
+                  
+                  case SDLK_q:
+                  //game_exit();
+                  run_menu_loop();
+                  last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
+                  break;
 
-                // TESTS
-                /*if (event.key.keysym.sym == SDLK_k)
-                {
-                  printf("%s Half Res\n", half_res?"Disabling":"Enabling");
-                  set_fullscreen(!half_res, true);
-                }*/
-                if (event.key.keysym.sym == SDLK_h)
-                {
+                  case SDLK_h:
                   aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
+                  break;
+
+                  default:
+                  break;
                 }
 
                 gfx_sdl_onkeydown(event.key.keysym.sym);
@@ -531,7 +527,6 @@ static bool gfx_sdl_start_frame(void) {
 }
 
 static void sync_framerate_with_timer(void) {
-    static Uint32 last_time = 0;
     //printf("%s\n", __func__);
 
     // get base timestamp on the first frame (might be different from 0)
@@ -1026,6 +1021,10 @@ static void gfx_sdl_shutdown(void) {
     if(sdl_screen_subRes[i]){SDL_FreeSurface(sdl_screen_subRes[i]);}
   }
 
+  deinit_menu_SDL();
+
+  TTF_Quit();
+
   SDL_RemoveTimer(idTimer);
 
   const double elapsed = (SDL_GetTicks() - f_time) / 1000.0;
@@ -1035,6 +1034,8 @@ static void gfx_sdl_shutdown(void) {
   printf("frametime %010.8lf sec\n", elapsed / (double)f_frames);
   printf("framerate %010.5lf fps\n\n", (double)f_frames / elapsed);
   fflush(stdout);
+
+  SDL_Quit();
 }
 
 struct GfxWindowManagerAPI gfx_sdl = {

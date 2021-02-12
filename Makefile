@@ -624,6 +624,7 @@ else ifeq ($(ENABLE_SOFTRAST),1)
 	else ifeq ($(TARGET_FUNKEY),1)
 	  GFX_CFLAGS  += $(shell /opt/FunKey-sdk-2.0.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell /opt/FunKey-sdk-2.0.0/arm-funkey-linux-musleabihf/sysroot/usr/bin/sdl-config --libs) -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -flto -s
+    GFX_LDFLAGS += -lSDL_ttf -lSDL_image
 	else ifeq ($(TARGET_BITTBOY),1)
 	  GFX_CFLAGS  += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --libs)  -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
