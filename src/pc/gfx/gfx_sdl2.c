@@ -264,6 +264,11 @@ static void set_fullscreen(bool on, bool call_callback) {
 #endif
 }
 
+/* Clear SDL screen (for multiple-buffering) */
+static void clear_screen(SDL_Surface *surface) {
+  memset(surface->pixels, 0, surface->w*surface->h*surface->format->BytesPerPixel);
+}
+
 int test_vsync(void) {
     // Even if SDL_GL_SetSwapInterval succeeds, it doesn't mean that VSync actually works.
     // A 60 Hz monitor should have a swap interval of 16.67 milliseconds.
@@ -497,6 +502,7 @@ static void gfx_sdl_handle_events(void) {
                   case SDLK_q:
                   //game_exit();
                   run_menu_loop();
+                  clear_screen(texture);
                   last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
                   break;
 
@@ -586,12 +592,6 @@ static void sync_framerate_with_timer(void) {
 static uint16_t rgb888Torgb565(uint32_t s)
 {
 	return (uint16_t) ((s >> 8 & 0xf800) + (s >> 5 & 0x7e0) + (s >> 3 & 0x1f));
-}
-
-
-/* Clear SDL screen (for multiple-buffering) */
-static void clear_screen(SDL_Surface *surface) {
-  memset(surface->pixels, 0, surface->w*surface->h*surface->format->BytesPerPixel);
 }
 
 
@@ -945,6 +945,99 @@ void downscale_320x240_to_240x240_bilinearish(SDL_Surface *src_surface, SDL_Surf
 }
 
 
+void downscale_320x240_to_240x180_bilinearish(SDL_Surface *src_surface, SDL_Surface *dst_surface)
+{
+  if (src_surface->w != 320)
+  {
+    printf("src_surface->w (%d) != 320 \n", src_surface->w);
+    return;
+  }
+  if (src_surface->h != 240)
+  {
+    printf("src_surface->h (%d) != 240 \n", src_surface->h);
+    return;
+  }
+
+  /// Compute padding for centering when out of bounds
+  int y_padding = (RES_HW_SCREEN_VERTICAL-180)/2;
+
+  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
+  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels + y_padding*RES_HW_SCREEN_HORIZONTAL;
+
+  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
+  // Horizontally: 320=80*4 240=80*3
+  // Vertically: 240=60*4 180=60*3
+  // Each block of 4*4 becomes 3*3
+  uint32_t BlockX, BlockY;
+  uint32_t *BlockSrc;
+  uint32_t *BlockDst;
+  for (BlockY = 0; BlockY < 60; BlockY++)
+  {
+    BlockSrc = Src32 + BlockY * 320 * 4;
+    BlockDst = Dst32 + BlockY * 240 * 3;
+    for (BlockX = 0; BlockX < 80; BlockX++)
+    {
+      /* Horizontaly:
+       * Before(4):
+       * (a)(b)(c)(d)
+       * After(3):
+       * (aaab)(bc)(cddd)
+       */
+
+      /* Verticaly:
+       * Before(2):
+       * (1)(2)(3)(4)
+       * After(4):
+       * (1112)(23)(3444)
+       */
+
+      // -- Data --
+      uint32_t _a1 = *(BlockSrc                          );
+      uint32_t _b1 = *(BlockSrc                       + 1);
+      uint32_t _c1 = *(BlockSrc                       + 2);
+      uint32_t _d1 = *(BlockSrc                       + 3);
+      uint32_t _a2 = *(BlockSrc             + 320 * 1    );
+      uint32_t _b2 = *(BlockSrc             + 320 * 1 + 1);
+      uint32_t _c2 = *(BlockSrc             + 320 * 1 + 2);
+      uint32_t _d2 = *(BlockSrc             + 320 * 1 + 3);
+      uint32_t _a3 = *(BlockSrc             + 320 * 2    );
+      uint32_t _b3 = *(BlockSrc             + 320 * 2 + 1);
+      uint32_t _c3 = *(BlockSrc             + 320 * 2 + 2);
+      uint32_t _d3 = *(BlockSrc             + 320 * 2 + 3);
+      uint32_t _a4 = *(BlockSrc             + 320 * 3    );
+      uint32_t _b4 = *(BlockSrc             + 320 * 3 + 1);
+      uint32_t _c4 = *(BlockSrc             + 320 * 3 + 2);
+      uint32_t _d4 = *(BlockSrc             + 320 * 3 + 3);
+
+      uint32_t _a2a2a2b2  = Weight3_1( _a2, _b2);
+      uint32_t _a3a3a3b3  = Weight3_1( _a3, _b3);
+      uint32_t _b2c2      = Weight1_1( _b2, _c2);
+      uint32_t _b3c3      = Weight1_1( _b3, _c3);
+      uint32_t _c2d2d2d2  = Weight1_3( _c2, _d2);
+      uint32_t _c3d3d3d3  = Weight1_3( _c3, _d3);
+
+      // -- Line 1 --
+      *(BlockDst                               ) = Weight3_1( Weight3_1( _a1, _b1), _a2a2a2b2             );
+      *(BlockDst                            + 1) = Weight3_1( Weight1_1( _b1, _c1), _b2c2                 );
+      *(BlockDst                            + 2) = Weight3_1( Weight1_3( _c1, _d1), _c2d2d2d2             );
+
+      // -- Line 2 --
+      *(BlockDst                  + 240 * 1    ) = Weight1_1( _a2a2a2b2           , _a3a3a3b3             );
+      *(BlockDst                  + 240 * 1 + 1) = Weight1_1( _b2c2               , _b3c3                 );
+      *(BlockDst                  + 240 * 1 + 2) = Weight1_1( _c2d2d2d2           , _c3d3d3d3             );
+
+      // -- Line 3 --
+      *(BlockDst                  + 240 * 2    ) = Weight1_3( _a3a3a3b3           , Weight3_1( _a4, _b4)  );
+      *(BlockDst                  + 240 * 2 + 1) = Weight1_3( _b3c3               , Weight1_1( _b4, _c4)  );
+      *(BlockDst                  + 240 * 2 + 2) = Weight1_3( _c3d3d3d3           , Weight1_3( _c4, _d4)  );
+
+      BlockSrc += 4;
+      BlockDst += 3;
+    }
+  }
+}
+
+
 
 static void gfx_sdl_swap_buffers_begin(void) {
 
@@ -965,17 +1058,17 @@ static void gfx_sdl_swap_buffers_begin(void) {
     	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
     #endif*/
 
+    /** Clear screen on aspect ratio change */
+    static prev_aspect_ratio = ASPECT_RATIOS_TYPE_SCALED;
+    if(prev_aspect_ratio != aspect_ratio){
+      prev_aspect_ratio = aspect_ratio;
+      clear_screen(texture);
+    }
 
     /** Cropped */
-    if(aspect_ratio == ASPECT_RATIOS_TYPE_CROPPED){
-      if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-        upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
-      }
-      else{
-        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
-      }
-    }
-    else{ /** Stretched */
+    switch (aspect_ratio){
+
+      case ASPECT_RATIOS_TYPE_STRETCHED:
       if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
         upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
       }
@@ -985,8 +1078,31 @@ static void gfx_sdl_swap_buffers_begin(void) {
       else{
         flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
       }
+      break;
+
+      case ASPECT_RATIOS_TYPE_SCALED:
+      if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
+        downscale_320x240_to_240x180_bilinearish(sdl_screen, texture);
+      }
+      else{
+        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, configScreenHeight*RES_HW_SCREEN_HORIZONTAL/configScreenWidth);
+      }
+      break;
+
+      case ASPECT_RATIOS_TYPE_CROPPED:
+      if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+        upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
+      }
+      else{
+        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+      }
+      break;
+
+      default:
+      printf("Wrong aspect ratio value: %s, setting stretched\n", aspect_ratio);
+      aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
+      break;
     }
-    
 
     //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
     //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);

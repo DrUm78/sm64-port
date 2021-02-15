@@ -38,14 +38,16 @@ bool configEnableFog             = false;
 #ifdef RS97
 unsigned int configScreenWidth   = 80;
 unsigned int configScreenHeight  = 60;
+unsigned int configFrameskip     = 30;
 #elif defined(FUNKEY)
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
+unsigned int configFrameskip     = 5;
 #else
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
-#endif
 unsigned int configFrameskip     = 30;
+#endif
 // Keyboard mappings (scancode values)
 #ifdef TARGET_DOS
 // Allegro scancodes
