@@ -131,14 +131,20 @@ def main():
 
     # Load ROMs
     roms = {}
-    for lang in langs:
+    romNotFound=True
+    lang=all_langs[0]
+    for lang in all_langs:
         fname = "baserom." + lang + ".z64"
         try:
             with open(fname, "rb") as f:
                 roms[lang] = f.read()
+                romNotFound = False
+                print("File " + fname + " opened successfully! ")
         except Exception as e:
             print("Failed to open " + fname + "! " + str(e))
-            sys.exit(1)
+            continue
+            #sys.exit(1)
+
         sha1 = hashlib.sha1(roms[lang]).hexdigest()
         with open("sm64." + lang + ".sha1", "r") as f:
             expected_sha1 = f.read().split()[0]
@@ -151,7 +157,13 @@ def main():
                 + expected_sha1
                 + ". Results might be unexpected."
             )
+        break
             #sys.exit(1)
+
+    if romNotFound:
+        print("ERROR: File \"baserom.<version>.z64\" file not found!")
+        sys.exit(1)
+
 
     make = "make"
 
@@ -171,7 +183,7 @@ def main():
     # Import new assets
     for key in keys:
         assets = todo[key]
-        lang, mio0 = key
+        useless,mio0 = key
         if mio0 == "@sound":
             with tempfile.NamedTemporaryFile(prefix="ctl", delete=False) as ctl_file:
                 with tempfile.NamedTemporaryFile(prefix="tbl", delete=False) as tbl_file:
