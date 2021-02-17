@@ -42,7 +42,7 @@ unsigned int configFrameskip     = 30;
 #elif defined(FUNKEY)
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
-unsigned int configFrameskip     = 5;
+unsigned int configFrameskip     = 2;
 #else
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
@@ -73,10 +73,10 @@ unsigned int configKeyStickRight =  4;
     unsigned int configKeyStart      = 31;
     unsigned int configKeyR          = 49;
     unsigned int configKeyZ          = 50;
-    unsigned int configKeyCUp        = 0x148;
-    unsigned int configKeyCDown      = 0x150;
-    unsigned int configKeyCLeft      = 0x2A;
-    unsigned int configKeyCRight     = 0x39;
+    unsigned int configKeyCUp        = 47;
+    unsigned int configKeyCDown      = 24;
+    unsigned int configKeyCLeft      = 36;
+    unsigned int configKeyCRight     = 23;
     unsigned int configKeyStickUp    = 22;
     unsigned int configKeyStickDown  = 32;
     unsigned int configKeyStickLeft  = 38;
