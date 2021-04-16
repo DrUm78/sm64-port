@@ -367,6 +367,7 @@ void init_menu_system_values(){
         volume_percentage = 50; ///wrong value: setting default to 50
     }
     else{
+        pclose(fp);
         fgets(res, sizeof(res)-1, fp);
 
         /// Check if Volume is a number (at least the first char)
@@ -389,6 +390,7 @@ void init_menu_system_values(){
         brightness_percentage = 50; ///wrong value: setting default to 50
     }
     else{
+        pclose(fp);
         fgets(res, sizeof(res)-1, fp);
 
         /// Check if brightness is a number (at least the first char)
@@ -633,7 +635,10 @@ void run_menu_loop()
 			RES_HW_SCREEN_HORIZONTAL * RES_HW_SCREEN_VERTICAL * sizeof(uint32_t));
 
     /* Stop Ampli */
-    popen(SHELL_CMD_TURN_AMPLI_OFF, "r");
+    fp = popen(SHELL_CMD_TURN_AMPLI_OFF, "r");
+    if (fp != NULL) {
+        pclose(fp);
+    }
  
     /// -------- Main loop ---------
     while (!stop_menu_loop)
@@ -711,7 +716,9 @@ void run_menu_loop()
                             fp = popen(shell_cmd, "r");
                             if (fp == NULL) {
                                 MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
-                            }
+                            } else {
+			        pclose(fp);
+			    }
 
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
@@ -727,6 +734,8 @@ void run_menu_loop()
                             fp = popen(shell_cmd, "r");
                             if (fp == NULL) {
                                 MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
+                            } else {
+			        pclose(fp);
                             }
                         /// ------ Refresh screen ------
                             screen_refresh = 1;
@@ -750,9 +759,12 @@ void run_menu_loop()
 
                             /// ----- Shell cmd ----
                             sprintf(shell_cmd, "%s %d", SHELL_CMD_VOLUME_SET, volume_percentage);                   
-                            fp = popen(shell_cmd, "r");
+                            fp =
+			      popen(shell_cmd, "r");
                             if (fp == NULL) {
                                 MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
+                            } else {
+			        pclose(fp);
                             }
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
@@ -768,6 +780,8 @@ void run_menu_loop()
                             fp = popen(shell_cmd, "r");
                             if (fp == NULL) {
                                 MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
+                            } else {
+			        pclose(fp);
                             }
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
@@ -866,5 +880,8 @@ void run_menu_loop()
     }
 
     /* Start Ampli */
-    popen(SHELL_CMD_TURN_AMPLI_ON, "r");
+    fp = popen(SHELL_CMD_TURN_AMPLI_ON, "r");
+    if (fp != NULL) {
+        pclose(fp);
+    }
 }
