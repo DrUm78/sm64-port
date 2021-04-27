@@ -614,7 +614,6 @@ void run_menu_loop()
     int start_scroll=0;
     uint8_t screen_refresh = 1;
     char shell_cmd[100];
-    FILE *fp;
     uint8_t menu_confirmation = 0;
     stop_menu_loop = 0;
     char fname[MAXPATHLEN];
@@ -634,10 +633,7 @@ void run_menu_loop()
 			RES_HW_SCREEN_HORIZONTAL * RES_HW_SCREEN_VERTICAL * sizeof(uint32_t));
 
     /* Stop Ampli */
-    fp = popen(SHELL_CMD_TURN_AMPLI_OFF, "r");
-    if (fp != NULL) {
-        pclose(fp);
-    }
+    system(SHELL_CMD_TURN_AMPLI_OFF);
  
     /// -------- Main loop ---------
     while (!stop_menu_loop)
@@ -712,12 +708,7 @@ void run_menu_loop()
 
                             /// ----- Shell cmd ----
                             sprintf(shell_cmd, "%s %d", SHELL_CMD_VOLUME_SET, volume_percentage);                   
-                            fp = popen(shell_cmd, "r");
-                            if (fp == NULL) {
-                                MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
-                            } else {
-			        pclose(fp);
-			    }
+                            system(shell_cmd);
 
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
@@ -730,13 +721,9 @@ void run_menu_loop()
 
                             /// ----- Shell cmd ----
                             sprintf(shell_cmd, "%s %d", SHELL_CMD_BRIGHTNESS_SET, brightness_percentage);                   
-                            fp = popen(shell_cmd, "r");
-                            if (fp == NULL) {
-                                MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
-                            } else {
-			        pclose(fp);
-                            }
-                        /// ------ Refresh screen ------
+                            system(shell_cmd);
+
+			    /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
                         else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
@@ -758,13 +745,8 @@ void run_menu_loop()
 
                             /// ----- Shell cmd ----
                             sprintf(shell_cmd, "%s %d", SHELL_CMD_VOLUME_SET, volume_percentage);                   
-                            fp =
-			      popen(shell_cmd, "r");
-                            if (fp == NULL) {
-                                MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
-                            } else {
-			        pclose(fp);
-                            }
+                            system(shell_cmd);
+
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
@@ -776,12 +758,8 @@ void run_menu_loop()
 
                             /// ----- Shell cmd ----
                             sprintf(shell_cmd, "%s %d", SHELL_CMD_BRIGHTNESS_SET, brightness_percentage);                   
-                            fp = popen(shell_cmd, "r");
-                            if (fp == NULL) {
-                                MENU_ERROR_PRINTF("Failed to run command %s\n", shell_cmd);
-                            } else {
-			        pclose(fp);
-                            }
+                            system(shell_cmd);
+
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
@@ -882,8 +860,5 @@ void run_menu_loop()
     }
 
     /* Start Ampli */
-    fp = popen(SHELL_CMD_TURN_AMPLI_ON, "r");
-    if (fp != NULL) {
-        pclose(fp);
-    }
+    system(SHELL_CMD_TURN_AMPLI_ON);
 }
