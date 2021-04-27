@@ -45,6 +45,8 @@ typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
 #define SHELL_CMD_CANCEL_SCHED_POWERDOWN    "cancel_sched_powerdown"
 #define SHELL_CMD_INSTANT_PLAY              "instant_play"
 #define SHELL_CMD_SHUTDOWN_FUNKEY           "shutdown_funkey"
+#define SHELL_CMD_KEYMAP_DEFAULT            "keymap default"
+#define SHELL_CMD_KEYMAP_RESUME             "keymap resume"
 
 ////------ Global variables -------
 extern int volume_percentage;
