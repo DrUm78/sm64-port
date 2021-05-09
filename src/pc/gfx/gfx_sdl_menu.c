@@ -633,7 +633,7 @@ void run_menu_loop()
 			RES_HW_SCREEN_HORIZONTAL * RES_HW_SCREEN_VERTICAL * sizeof(uint32_t));
 
     /* Stop Ampli */
-    system(SHELL_CMD_TURN_AMPLI_OFF);
+    system(SHELL_CMD_AUDIO_AMP_OFF);
  
     /// -------- Main loop ---------
     while (!stop_menu_loop)
@@ -860,5 +860,5 @@ void run_menu_loop()
     }
 
     /* Start Ampli */
-    system(SHELL_CMD_TURN_AMPLI_ON);
+    system(SHELL_CMD_AUDIO_AMP_ON);
 }
