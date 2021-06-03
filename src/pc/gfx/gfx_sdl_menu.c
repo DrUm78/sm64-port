@@ -795,8 +795,8 @@ void run_menu_loop()
                                 MENU_DEBUG_PRINTF("Powerdown - confirmed\n");
 
                                 /// ----- Shell cmd ----
-                                execlp(SHELL_CMD_SHUTDOWN_FUNKEY, SHELL_CMD_SHUTDOWN_FUNKEY, NULL);
-                                MENU_ERROR_PRINTF("Failed to run command %s\n", SHELL_CMD_SHUTDOWN_FUNKEY);
+                                execlp(SHELL_CMD_POWERDOWN, SHELL_CMD_POWERDOWN, NULL);
+                                MENU_ERROR_PRINTF("Failed to run command %s\n", SHELL_CMD_POWERDOWN);
                                 exit(0);
                             }
                             else{

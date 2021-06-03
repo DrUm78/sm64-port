@@ -512,7 +512,7 @@ static void gfx_sdl_handle_events(void) {
 
                   char shell_cmd_tmp[100];
                   sprintf(shell_cmd_tmp, "%s %d \"    DISPLAY MODE: %s\"", 
-                    SHELL_CMD_NOTIF, NOTIF_SECONDS_DISP, aspect_ratio_name[aspect_ratio]);
+                    SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP, aspect_ratio_name[aspect_ratio]);
                   FILE *fp_tmp = popen(shell_cmd_tmp, "r");
                   if (fp_tmp == NULL) {
                     printf("Failed to run command %s\n", shell_cmd_tmp);
