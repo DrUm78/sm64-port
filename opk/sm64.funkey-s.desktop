@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=SM64
+Comment=Super Mario 64 port for the FunKey S
+Exec=sm64.us.f3dex2e
+Icon=sm64
+Categories=games

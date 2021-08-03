@@ -1099,8 +1099,8 @@ static void gfx_sdl_swap_buffers_begin(void) {
       break;
 
       default:
-      printf("Wrong aspect ratio value: %s, setting stretched\n", aspect_ratio);
-      aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
+      printf("Wrong aspect ratio value: %s, setting cropped\n", aspect_ratio);
+      aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
       break;
     }
 
