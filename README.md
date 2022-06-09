@@ -12,7 +12,7 @@ This is a novelty port of the sm64-port to DOS. Do not expect it to be playable.
 
 ### FunKey S
 Simply go on this webpage and follow the instructions:
-https://colab.research.google.com/drive/1VgF2-VJVLJ9UTT-Obo-bP5p_kpP4D49H?usp=sharing
+https://drive.google.com/file/d/1j4urSTOcb2hXCC6ykBeyJspJ0eJcdR5U/view?usp=sharing
 
 ### Docker
 
