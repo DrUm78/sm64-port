@@ -100,7 +100,7 @@ int brightness_percentage = 0;
 #undef X
 #define X(a, b) b,
 const char *aspect_ratio_name[] = {ASPECT_RATIOS};
-int aspect_ratio = ASPECT_RATIOS_TYPE_STRETCHED;
+int aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
 int aspect_ratio_factor_percent = 50;
 int aspect_ratio_factor_step = 10;
 

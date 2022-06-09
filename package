@@ -1,0 +1,8 @@
+#!/bin/sh
+
+rm -f *.opk
+git fetch --all
+git merge upstream/FunKey
+make distclean
+make -j16
+./build_opk.sh funkey-s
