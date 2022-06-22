@@ -3330,10 +3330,10 @@ static const Vtx intro_seg7_vertex_0700B420[] = {
 
 // 0x0700B460 - 0x0700B4A0
 static const Vtx intro_seg7_vertex_0700B460[] = {
-    {{{   268,    180,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   284,    180,     -1}, 0, {   544,    512}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   284,    196,     -1}, 0, {   544,      0}, {0xff, 0xff, 0xff, 0xff}}},
-    {{{   268,    196,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{   262,    180,     -1}, 0, {     0,    512}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{   278,    180,     -1}, 0, {   544,    512}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{   278,    196,     -1}, 0, {   544,      0}, {0xff, 0xff, 0xff, 0xff}}},
+    {{{   262,    196,     -1}, 0, {     0,      0}, {0xff, 0xff, 0xff, 0xff}}},
 };
 
 #ifdef VERSION_EU

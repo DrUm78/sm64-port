@@ -103,8 +103,8 @@ void Proc8018E520(struct ObjJoint *self) {
     self->mat128[3][2] += self->unk78.z;
 
     if (self->header.drawFlags & OBJ_PICKED) {
-        gGdCtrl.csrX -= (gGdCtrl.csrX - gGdCtrl.csrXatApress) * 0.2;
-        gGdCtrl.csrY -= (gGdCtrl.csrY - gGdCtrl.csrYatApress) * 0.2;
+        gGdCtrl.csrX -= (gGdCtrl.csrX - gGdCtrl.csrXatApress) * 0.1;
+        gGdCtrl.csrY -= (gGdCtrl.csrY - gGdCtrl.csrYatApress) * 0.1;
     }
 
     sp64.x = self->mat128[3][0] - self->unk54.x;

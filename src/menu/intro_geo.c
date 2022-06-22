@@ -91,18 +91,18 @@ Gfx *geo_title_screen(s32 sp50, struct GraphNode *sp54, UNUSED void *context) {
         displayList = alloc_display_list(4 * sizeof(*displayList));
         displayListIter = displayList;
         if (gTitleZoomCounter >= 0 && gTitleZoomCounter < INTRO_STEPS_ZOOM_IN) {
-            scaleX = scaleTable1[gTitleZoomCounter * 3];
-            scaleY = scaleTable1[gTitleZoomCounter * 3 + 1];
-            scaleZ = scaleTable1[gTitleZoomCounter * 3 + 2];
+            scaleX = scaleTable1[gTitleZoomCounter * 3] * 0.9;
+            scaleY = scaleTable1[gTitleZoomCounter * 3 + 1] * 0.9;
+            scaleZ = scaleTable1[gTitleZoomCounter * 3 + 2] * 0.9;
         } else if (gTitleZoomCounter >= INTRO_STEPS_ZOOM_IN && gTitleZoomCounter < INTRO_STEPS_HOLD_1) {
-            scaleX = 1.0f;
-            scaleY = 1.0f;
-            scaleZ = 1.0f;
+            scaleX = 0.9f;
+            scaleY = 0.9f;
+            scaleZ = 0.9f;
         } else if (gTitleZoomCounter >= INTRO_STEPS_HOLD_1
                    && gTitleZoomCounter < INTRO_STEPS_ZOOM_OUT) {
-            scaleX = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3];
-            scaleY = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3 + 1];
-            scaleZ = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3 + 2];
+            scaleX = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3] * 0.9;
+            scaleY = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3 + 1] * 0.9;
+            scaleZ = scaleTable2[(gTitleZoomCounter - INTRO_STEPS_HOLD_1) * 3 + 2] * 0.9;
         } else {
             scaleX = 0.0f;
             scaleY = 0.0f;

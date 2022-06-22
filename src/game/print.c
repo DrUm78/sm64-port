@@ -277,7 +277,7 @@ void print_text_centered(s32 x, s32 y, const char *str) {
     }
 
     sTextLabels[sTextLabelsCount]->length = length;
-    sTextLabels[sTextLabelsCount]->x = x - length * 12 / 2;
+    sTextLabels[sTextLabelsCount]->x = x - length * 12 / 2 + 14;
     sTextLabels[sTextLabelsCount]->y = y;
     sTextLabelsCount++;
 }

@@ -2361,8 +2361,8 @@ void parse_p1_controller(void) {
     gdctrl->stickYf = (f32) p1cont->stick_y;
     gdctrl->stickDeltaX = gdctrl->stickX;
     gdctrl->stickDeltaY = gdctrl->stickY;
-    gdctrl->stickX = (s32) p1cont->stick_x;
-    gdctrl->stickY = (s32) p1cont->stick_y;
+    gdctrl->stickX = (s32) p1cont->stick_x / 2;
+    gdctrl->stickY = (s32) p1cont->stick_y / 2;
     gdctrl->stickDeltaX -= gdctrl->stickX;
     gdctrl->stickDeltaY -= gdctrl->stickY;
     // button values (as bools)

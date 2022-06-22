@@ -1612,8 +1612,8 @@ void handle_controller_cursor_input(void) {
     }
 
     // Move cursor
-    sCursorPos[0] += rawStickX / 8;
-    sCursorPos[1] += rawStickY / 8;
+    sCursorPos[0] += rawStickX / 16;
+    sCursorPos[1] += rawStickY / 16;
 
     // Stop cursor from going offscreen
     if (sCursorPos[0] > 132.0f) {
