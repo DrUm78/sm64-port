@@ -742,7 +742,7 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
         prg->mix = SH_MT_TEXTURE_COLOR;
         if (ccf.num_inputs > 1)
             prg->combine = combine_tex_rgb_rgb; // only one such known shader
-        else if (shader_id == 0x0000038D || shader_id == 0x01200A00 || shader_id == 0x01045A00)
+        else if (shader_id == 0x0000038D || shader_id == 0x01200A00 || shader_id == 0x01045A00 || shader_id == 0x0120038D)
             prg->combine = ccf.opt_alpha ? combine_tex_rgba_decal : combine_tex_rgb_decal;
         else if (ccf.opt_fog)
             prg->combine = ccf.opt_alpha ? combine_tex_fog_rgba : combine_tex_fog_rgb;
