@@ -7,7 +7,7 @@ typedef enum{
     MENU_TYPE_BRIGHTNESS,
     MENU_TYPE_SAVE,
     MENU_TYPE_LOAD,
-    MENU_TYPE_ASPECT_RATIO,
+//    MENU_TYPE_ASPECT_RATIO,
     MENU_TYPE_EXIT,
     MENU_TYPE_POWERDOWN,
     NB_MENU_TYPES,
@@ -15,16 +15,16 @@ typedef enum{
 
 
 ///------ Definition of the different aspect ratios 
-#define ASPECT_RATIOS \
-    X(ASPECT_RATIOS_TYPE_STRETCHED, "STRETCHED") \
-    X(ASPECT_RATIOS_TYPE_SCALED, "SCALED") \
-    X(ASPECT_RATIOS_TYPE_CROPPED, "CROPPED") \
-    X(NB_ASPECT_RATIOS_TYPES, "") 
+// #define ASPECT_RATIOS \
+//     X(ASPECT_RATIOS_TYPE_STRETCHED, "STRETCHED") \
+//     X(ASPECT_RATIOS_TYPE_SCALED, "SCALED") \
+//     X(ASPECT_RATIOS_TYPE_CROPPED, "CROPPED") \
+//     X(NB_ASPECT_RATIOS_TYPES, "") 
 
-////------ Enumeration of the different aspect ratios ------
-#undef X
-#define X(a, b) a,
-typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
+// ////------ Enumeration of the different aspect ratios ------
+// #undef X
+// #define X(a, b) a,
+// typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
 
 ////------ Defines to be shared -------
 #define RES_HW_SCREEN_HORIZONTAL    240
@@ -51,10 +51,10 @@ typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
 extern int volume_percentage;
 extern int brightness_percentage;
 
-extern const char *aspect_ratio_name[];
-extern int aspect_ratio;
-extern int aspect_ratio_factor_percent;
-extern int aspect_ratio_factor_step;
+// extern const char *aspect_ratio_name[];
+// extern int aspect_ratio;
+// extern int aspect_ratio_factor_percent;
+// extern int aspect_ratio_factor_step;
 extern int stop_menu_loop;
 
 //####################################

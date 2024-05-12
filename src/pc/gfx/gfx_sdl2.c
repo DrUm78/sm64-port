@@ -506,19 +506,30 @@ static void gfx_sdl_handle_events(void) {
                   last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
                   break;
 
-                  case SDLK_h:
-                  //printf("Aspect ratio change\n");
-                  aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
+                  // case SDLK_h:
+                  // //printf("Aspect ratio change\n");
+                  // aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
 
-                  char shell_cmd_tmp[100];
-                  sprintf(shell_cmd_tmp, "%s %d \"    DISPLAY MODE: %s\"", 
-                    SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP, aspect_ratio_name[aspect_ratio]);
-                  FILE *fp_tmp = popen(shell_cmd_tmp, "r");
-                  if (fp_tmp == NULL) {
-                    printf("Failed to run command %s\n", shell_cmd_tmp);
-                  }
-                  pclose(fp_tmp);
+                  // char shell_cmd_tmp[100];
+                  // sprintf(shell_cmd_tmp, "%s %d \"    DISPLAY MODE: %s\"", 
+                  //   SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP, aspect_ratio_name[aspect_ratio]);
+                  // FILE *fp_tmp = popen(shell_cmd_tmp, "r");
+                  // if (fp_tmp == NULL) {
+                  //   printf("Failed to run command %s\n", shell_cmd_tmp);
+                  // }
+                  // pclose(fp_tmp);
+                  // break;
+
+// testing output of dynamics resolutions on desktop
+#ifdef DEBUG
+                  case SDLK_F11:
+                    set_lowerRes(dichotomic_res_change, true);
                   break;
+
+                  case SDLK_F12:
+                    set_higherRes(dichotomic_res_change, true);
+                  break;
+#endif
 
                   default:
                   break;
@@ -1058,55 +1069,57 @@ static void gfx_sdl_swap_buffers_begin(void) {
     	SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
     #endif*/
 
-    /** Clear screen on aspect ratio change */
-    static prev_aspect_ratio = ASPECT_RATIOS_TYPE_SCALED;
-    if(prev_aspect_ratio != aspect_ratio){
-      prev_aspect_ratio = aspect_ratio;
-      clear_screen(texture);
-    }
+    // /** Clear screen on aspect ratio change */
+    // static prev_aspect_ratio = ASPECT_RATIOS_TYPE_SCALED;
+    // if(prev_aspect_ratio != aspect_ratio){
+    //   prev_aspect_ratio = aspect_ratio;
+    //   clear_screen(texture);
+    // }
 
-    /** Cropped */
-    switch (aspect_ratio){
+    // switch (aspect_ratio){
 
-      case ASPECT_RATIOS_TYPE_STRETCHED:
-      if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-        upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
-      }
-      else if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
-        downscale_320x240_to_240x240_bilinearish(sdl_screen, texture);
-      }
-      else{
-        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
-      }
-      break;
+    //   /** Stretched */
+    //   case ASPECT_RATIOS_TYPE_STRETCHED:
+    //   if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+    //     upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
+    //   }
+    //   else if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
+    //     downscale_320x240_to_240x240_bilinearish(sdl_screen, texture);
+    //   }
+    //   else{
+    //     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
+    //   }
+    //   break;
 
-      case ASPECT_RATIOS_TYPE_SCALED:
-      if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
-        downscale_320x240_to_240x180_bilinearish(sdl_screen, texture);
-      }
-      else{
-        flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, configScreenHeight*RES_HW_SCREEN_HORIZONTAL/configScreenWidth);
-      }
-      break;
+    //   /** Scaled */
+    //   case ASPECT_RATIOS_TYPE_SCALED:
+    //   if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
+    //     downscale_320x240_to_240x180_bilinearish(sdl_screen, texture);
+    //   }
+    //   else{
+    //     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, configScreenHeight*RES_HW_SCREEN_HORIZONTAL/configScreenWidth);
+    //   }
+    //   break;
 
-      case ASPECT_RATIOS_TYPE_CROPPED:
+    //   /** Cropped */
+    //   case ASPECT_RATIOS_TYPE_CROPPED:
       if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
         upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
       }
       else{
         flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
       }
-      break;
+    //   break;
 
-      default:
-      printf("Wrong aspect ratio value: %s, setting cropped\n", aspect_ratio);
-      aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
-      break;
-    }
+    //   default:
+    //   printf("Wrong aspect ratio value: %s, setting cropped\n", aspect_ratio);
+    //   aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
+    //   break;
+    // }
 
-    //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
-    //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);
-    //SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
+    // //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
+    // //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);
+    // //SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
 	
     SDL_Flip(texture);
 #endif
@@ -1118,6 +1131,8 @@ static void gfx_sdl_swap_buffers_begin(void) {
 static void gfx_sdl_swap_buffers_end(void) {
     f_frames++;
 
+    // let F11 and F12 control this for testing when debugging
+#ifndef DEBUG
     if(NB_SUBRESOLUTIONS > 1){
         if( (fast_speed_in_a_row >= MAX_FAST_SPEED_IN_A_ROW || fullscreen_state) && current_res_idx != 0){
           
@@ -1136,6 +1151,7 @@ static void gfx_sdl_swap_buffers_end(void) {
           set_lowerRes(dichotomic_res_change, true);
         }
     }
+#endif
 }
 
 static double gfx_sdl_get_time(void) {

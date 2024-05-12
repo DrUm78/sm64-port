@@ -97,12 +97,12 @@ static uint16_t y_brightness_bar = 0;
 int volume_percentage = 0;
 int brightness_percentage = 0;
 
-#undef X
-#define X(a, b) b,
-const char *aspect_ratio_name[] = {ASPECT_RATIOS};
-int aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
-int aspect_ratio_factor_percent = 50;
-int aspect_ratio_factor_step = 10;
+// #undef X
+// #define X(a, b) b,
+// const char *aspect_ratio_name[] = {ASPECT_RATIOS};
+// int aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
+// int aspect_ratio_factor_percent = 50;
+// int aspect_ratio_factor_step = 10;
 
 
 /// -------------- FUNCTIONS DECLARATION --------------
@@ -299,14 +299,14 @@ void add_menu_zone(ENUM_MENU_TYPE menu_type){
         text_pos.y = surface->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 - padding_y_from_center_menu_zone*2;
         SDL_BlitSurface(text_surface, NULL, surface, &text_pos);
         break;
-    case MENU_TYPE_ASPECT_RATIO:
-        MENU_DEBUG_PRINTF("Init MENU_TYPE_ASPECT_RATIO\n");
-        /// ------ Text ------
-        text_surface = TTF_RenderText_Blended(menu_title_font, "ASPECT RATIO", text_color);
-        text_pos.x = (surface->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
-        text_pos.y = surface->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 - padding_y_from_center_menu_zone;
-        SDL_BlitSurface(text_surface, NULL, surface, &text_pos);
-        break;
+    // case MENU_TYPE_ASPECT_RATIO:
+    //     MENU_DEBUG_PRINTF("Init MENU_TYPE_ASPECT_RATIO\n");
+    //     /// ------ Text ------
+    //     text_surface = TTF_RenderText_Blended(menu_title_font, "ASPECT RATIO", text_color);
+    //     text_pos.x = (surface->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
+    //     text_pos.y = surface->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 - padding_y_from_center_menu_zone;
+    //     SDL_BlitSurface(text_surface, NULL, surface, &text_pos);
+    //     break;
     case MENU_TYPE_EXIT:
         MENU_DEBUG_PRINTF("Init MENU_TYPE_EXIT\n");
         /// ------ Text ------
@@ -346,7 +346,7 @@ void init_menu_zones(){
     //add_menu_zone(MENU_TYPE_LOAD);
     
     /// Init Aspect Ratio Menu
-    add_menu_zone(MENU_TYPE_ASPECT_RATIO);
+    //add_menu_zone(MENU_TYPE_ASPECT_RATIO);
     
     /// Init Exit Menu
     add_menu_zone(MENU_TYPE_EXIT);
@@ -551,13 +551,13 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
             break;
 #endif //0
 
-        case MENU_TYPE_ASPECT_RATIO:
-            sprintf(text_tmp, "<   %s   >", aspect_ratio_name[aspect_ratio]);
-            text_surface = TTF_RenderText_Blended(menu_info_font, text_tmp, text_color);
-            text_pos.x = (draw_screen->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
-            text_pos.y = draw_screen->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 + padding_y_from_center_menu_zone;
-            SDL_BlitSurface(text_surface, NULL, draw_screen, &text_pos);
-            break;
+        // case MENU_TYPE_ASPECT_RATIO:
+        //     sprintf(text_tmp, "<   %s   >", aspect_ratio_name[aspect_ratio]);
+        //     text_surface = TTF_RenderText_Blended(menu_info_font, text_tmp, text_color);
+        //     text_pos.x = (draw_screen->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
+        //     text_pos.y = draw_screen->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 + padding_y_from_center_menu_zone;
+        //     SDL_BlitSurface(text_surface, NULL, draw_screen, &text_pos);
+        //     break;
                 
         case MENU_TYPE_EXIT:
         case MENU_TYPE_POWERDOWN:
@@ -726,12 +726,12 @@ void run_menu_loop()
 			    /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
-                        else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
-                            MENU_DEBUG_PRINTF("Aspect Ratio DOWN\n");
-                            aspect_ratio = (!aspect_ratio)?(NB_ASPECT_RATIOS_TYPES-1):(aspect_ratio-1);
-                            /// ------ Refresh screen ------
-                            screen_refresh = 1;
-                        }
+                        // else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
+                        //     MENU_DEBUG_PRINTF("Aspect Ratio DOWN\n");
+                        //     aspect_ratio = (!aspect_ratio)?(NB_ASPECT_RATIOS_TYPES-1):(aspect_ratio-1);
+                        //     /// ------ Refresh screen ------
+                        //     screen_refresh = 1;
+                        // }
                         break;
 
                     case SDLK_r:
@@ -763,12 +763,12 @@ void run_menu_loop()
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
-                        else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
-                            MENU_DEBUG_PRINTF("Aspect Ratio UP\n");
-                            aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
-                            /// ------ Refresh screen ------
-                            screen_refresh = 1;
-                        }
+                        // else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
+                        //     MENU_DEBUG_PRINTF("Aspect Ratio UP\n");
+                        //     aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
+                        //     /// ------ Refresh screen ------
+                        //     screen_refresh = 1;
+                        // }
                         break;
 
                     case SDLK_a:
