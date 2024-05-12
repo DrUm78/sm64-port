@@ -12,7 +12,7 @@
 #define SDL_SURFACE
 #else
 //#define CONVERT
-#define DIRECT_SDL
+//#define DIRECT_SDL
 #define SDL_SURFACE
 #endif
 
