@@ -895,6 +895,13 @@ static void gfx_soft_set_viewport(int x, int y, int width, int height) {
 }
 
 static void gfx_soft_set_scissor(int x, int y, int width, int height) {
+    // small performance hack for the funkey-S :
+    // keep the logic of the graphics to be 4:3 so the HUD isn't messed up
+    // but crop here to process less pixels and get better performance
+    const int targetx = (gfx_current_dimensions.width - gfx_current_dimensions.height) >> 1;
+    const int targetw = gfx_current_dimensions.height; //+1;
+    if (x<targetx) x=targetx;
+    if (width>targetw) width=targetw;
     r_clip.x0 = x;
     r_clip.y0 = y;
     r_clip.x1 = x + width;

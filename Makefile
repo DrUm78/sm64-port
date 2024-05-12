@@ -240,7 +240,11 @@ else
   ifeq ($(TARGET_DOS),1)
     BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_dos
   else
-    BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
+    ifeq ($(TARGET_FUNKEY),1)
+      BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_funkey
+    else
+      BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
+    endif
   endif
 endif
 endif
@@ -316,7 +320,7 @@ else
 ifeq ($(TARGET_WEB),1)
   OPT_FLAGS := -O2 -g4 --source-map-base http://localhost:8080/
 else ifeq ($(DEBUG),1)
-  OPT_FLAGS := -g
+  OPT_FLAGS := -g -DDEBUG
 else
   OPT_FLAGS := -Ofast -ffast-math
 endif
@@ -592,7 +596,9 @@ ifneq ($(ENABLE_OPENGL)$(ENABLE_OPENGL_LEGACY),00)
     GFX_LDFLAGS += $(shell sdl-config --libs) -lglew32 -lopengl32 -lwinmm -limm32 -lversion -loleaut32 -lsetupapi
   endif
   ifeq ($(TARGET_LINUX),1)
-
+	  GFX_CFLAGS  += $(shell sdl-config --cflags)
+	  GFX_LDFLAGS += $(shell sdl-config --libs)
+    GFX_LDFLAGS += -lSDL_ttf -lSDL_image -lopengl32
   endif
   ifeq ($(TARGET_WEB),1)
     GFX_CFLAGS  += -s USE_SDL=2
@@ -634,6 +640,7 @@ else ifeq ($(ENABLE_SOFTRAST),1)
 	else
 	  GFX_CFLAGS  += $(shell sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell sdl-config --libs)
+    GFX_LDFLAGS += -lSDL_ttf -lSDL_image
 	endif
   endif
   ifeq ($(TARGET_WEB),1)
