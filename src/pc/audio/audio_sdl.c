@@ -8,8 +8,9 @@
 
 #include "audio_api.h"
 
-static int32_t BUFFSIZE;
-static uint8_t *buffer;
+//static int32_t BUFFSIZE; // 512 * 2 * 2 * 8
+#define BUFFSIZE 16384
+static uint8_t buffer[BUFFSIZE];
 static uint32_t buf_read_pos = 0;
 static uint32_t buf_write_pos = 0;
 static int32_t buffered_bytes = 0;
@@ -53,8 +54,8 @@ void sdl_callback(void *unused, uint8_t *stream, int32_t len)
 }
 
 static bool audio_sdl_init(void) {
-	BUFFSIZE = 512 * 2 * 2 * 8;
-	buffer = (uint8_t *) malloc(BUFFSIZE);
+	//BUFFSIZE = 512 * 2 * 2 * 8;
+	//buffer = (uint8_t *) malloc(BUFFSIZE);
     
 	if (SDL_Init(SDL_INIT_AUDIO) != 0) {
         fprintf(stderr, "SDL init error: %s\n", SDL_GetError());
@@ -76,7 +77,10 @@ static bool audio_sdl_init(void) {
 }
 
 static int audio_sdl_buffered(void) {
-   return buffered_bytes / 4;
+	SDL_LockAudio();
+	int ret=buffered_bytes / 4;
+	SDL_UnlockAudio();
+	return ret;
 }
 
 static int audio_sdl_get_desired_buffered(void) {

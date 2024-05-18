@@ -139,9 +139,9 @@ static uint32_t tex_num = 0; // amount of textures in cache
 static int cur_tmu = 0; // select tile (used only for uploading)
 
 // texture cache: linearly stores RGBA data of every cached texture
-static uint8_t *texcache;
+uint8_t *texcache;
 static uint32_t texcache_addr; // current offset into cache
-static uint32_t texcache_size; // cache capacity
+uint32_t texcache_size; // cache capacity
 
 static bool do_blend; // fragment blending toggle
 static bool do_clip;  // scissor toggle

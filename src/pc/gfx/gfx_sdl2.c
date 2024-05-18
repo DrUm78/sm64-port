@@ -29,6 +29,7 @@
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
 #include "gfx_sdl_menu.h"
+#include "../savestate.h"
 
 //#define DEBUG_ADAPTATIVE_RES
 #ifdef DEBUG_ADAPTATIVE_RES
@@ -530,6 +531,14 @@ static void gfx_sdl_handle_events(void) {
                     set_higherRes(dichotomic_res_change, true);
                   break;
 #endif
+
+                  case SDLK_F8:
+                  savestate_request_save(0);
+                  break;
+
+                  case SDLK_F9:
+                  savestate_request_load(0);
+                  break;
 
                   default:
                   break;

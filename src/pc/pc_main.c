@@ -33,6 +33,8 @@
 
 #include "compat.h"
 
+#include "savestate.h"
+
 #define CONFIG_FILE "sm64config.txt"
 
 OSMesg D_80339BEC;
@@ -234,6 +236,7 @@ void main_func(void) {
 #else
     inited = 1;
     while (1) {
+        savestate_check();
         wm_api->main_loop(produce_one_frame);
     }
 #endif
