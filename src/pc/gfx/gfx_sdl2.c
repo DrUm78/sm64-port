@@ -87,17 +87,17 @@ SDL_Surface *texture __attribute__((section("dontsave"))) = NULL;
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
 static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] __attribute__((section("dontsave")));
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
-static bool fullscreen_state;
+static bool fullscreen_state __attribute__((section("dontsave")));
 //static bool half_res = false;
-static int current_res_idx = 0;
+static int current_res_idx __attribute__((section("dontsave"))) = 0;
 
 // time between consecutive game frames
 const int frame_time = 1000 / FRAMERATE;
-static int too_slow_in_a_row = 0;
-static int fast_speed_in_a_row = 0;
-static int elapsed_time_avg = 0;
-static int elapsed_time_cnt = 0;
-static bool dichotomic_res_change = true;
+static int too_slow_in_a_row __attribute__((section("dontsave"))) = 0;
+static int fast_speed_in_a_row __attribute__((section("dontsave"))) = 0;
+static int elapsed_time_avg __attribute__((section("dontsave"))) = 0;
+static int elapsed_time_cnt __attribute__((section("dontsave"))) = 0;
+static bool dichotomic_res_change __attribute__((section("dontsave"))) = true;
 #define MAX_AVG_ELAPSED_TIME_COUNTS 3
 #define MAX_TOO_SLOW_IN_A_ROW       3
 #define MAX_FAST_SPEED_IN_A_ROW   3
@@ -105,8 +105,8 @@ static bool dichotomic_res_change = true;
 //static SDL_Window *wnd;
 static int inverted_scancode_table[512];
 static int vsync_enabled = 0;
-static unsigned int window_width = DESIRED_SCREEN_WIDTH;
-static unsigned int window_height = DESIRED_SCREEN_HEIGHT;
+static unsigned int window_width __attribute__((section("dontsave"))) = DESIRED_SCREEN_WIDTH;
+static unsigned int window_height __attribute__((section("dontsave"))) = DESIRED_SCREEN_HEIGHT;
 static void (*on_fullscreen_changed_callback)(bool is_now_fullscreen);
 static bool (*on_key_down_callback)(int scancode);
 static bool (*on_key_up_callback)(int scancode);
@@ -123,9 +123,9 @@ static Uint32 last_time __attribute__((section("dontsave"))) = 0;
 static int f_frames __attribute__((section("dontsave"))) = 0;
 static double f_time __attribute__((section("dontsave"))) = 0.0;
 
-#if defined(DIRECT_SDL) && defined(SDL_SURFACE)
-	uint32_t *gfx_output __attribute__((section("dontsave")));
-#endif
+// #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
+// 	uint32_t *gfx_output __attribute__((section("dontsave")));
+// #endif
 
 
 const SDLKey windows_scancode_table[] =

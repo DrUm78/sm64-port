@@ -178,7 +178,7 @@ static struct RenderingState {
     struct TextureHashmapNode *textures[2];
 } rendering_state;
 
-struct GfxDimensions gfx_current_dimensions;
+struct GfxDimensions gfx_current_dimensions __attribute__((section("dontsave")));
 static float ratio_x = 1.f;
 static float ratio_y = 1.f;
 static float inv_ratio_x = 1.f;

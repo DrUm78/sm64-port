@@ -120,9 +120,9 @@ struct ClipRect {
 
 #if !(defined(DIRECT_SDL) && defined(SDL_SURFACE))
 	#ifdef CONVERT
-	uint16_t *gfx_output;
+	uint16_t *gfx_output __attribute__((section("dontsave")));
 	#else
-	uint32_t *gfx_output;
+	uint32_t *gfx_output __attribute__((section("dontsave")));
 	#endif
 #endif
 
@@ -156,9 +156,9 @@ static bool z_write;       // whether to write into the Z buffer
 static float z_offset;     // offset for decal mode
 static uint16_t *z_buffer __attribute__((section("dontsave")));
 
-static int scr_width;
-static int scr_height;
-static int scr_size; // scr_width * scr_height
+static int scr_width __attribute__((section("dontsave")));
+static int scr_height __attribute__((section("dontsave")));
+static int scr_size __attribute__((section("dontsave"))); // scr_width * scr_height
 
 // color component interpolation table:
 // lerp(x, y, t) = x + (y - x) * t

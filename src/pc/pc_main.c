@@ -82,6 +82,7 @@ void send_display_list(struct SPTask *spTask) {
 #endif
 
 void produce_one_frame(void) {
+    savestate_check();
     gfx_start_frame();
     game_loop_one_iteration();
 
@@ -236,7 +237,6 @@ void main_func(void) {
 #else
     inited = 1;
     while (1) {
-        savestate_check();
         wm_api->main_loop(produce_one_frame);
     }
 #endif
