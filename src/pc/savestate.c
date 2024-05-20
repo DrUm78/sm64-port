@@ -39,19 +39,23 @@ static void* memstop = end;
 extern char __start_dontsave[];
 extern char __stop_dontsave[];
 
+// /!\/!\/!\ namebuffer size isn't checked /!\/!\/!
+void savestate_get_name(int slot, char* namebuffer) {
+    if (slot < 0) {
+        // let's have negative be a special value for the quick save slot
+        sprintf(namebuffer, "%s.quick", SAVESTATE_FILENAME);
+    }
+    else {
+        sprintf(namebuffer, "%s.%02d", SAVESTATE_FILENAME, slot);
+    }
+}
+
 FILE *fopen_slot(int slot, const char* mode) {
-    char* name;
+    char name[32];
     FILE* ret;
 
-    name = malloc(sizeof(SAVESTATE_FILENAME) + 5);
-	sprintf(name, "%s.%02d", SAVESTATE_FILENAME, slot);
-
-    ret = fopen_home(name,mode);
-    if (!ret) {
-        printf("Failed to open file %s\n", name);
-    }
-    free(name);
-    return ret;
+    savestate_get_name(slot,name);
+    return fopen_home(name,mode);
 }
 
 void trysave(int slot) {

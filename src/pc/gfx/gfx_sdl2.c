@@ -528,14 +528,6 @@ static void gfx_sdl_handle_events(void) {
                   break;
 #endif
 
-                  case SDLK_F8:
-                  savestate_request_save(1);
-                  break;
-
-                  case SDLK_F9:
-                  savestate_request_load(1);
-                  break;
-
                   default:
                   break;
                 }
