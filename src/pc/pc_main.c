@@ -52,7 +52,7 @@ static struct GfxWindowManagerAPI *wm_api;
 static struct GfxRenderingAPI *rendering_api;
 
 extern int stop_menu_loop;
-char *prog_name;
+char *prog_name __attribute__((section("dontsave")));
 
 extern void gfx_run(Gfx *commands);
 extern void thread5_game_loop(void *arg);
