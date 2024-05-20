@@ -801,18 +801,21 @@ void run_menu_loop()
                         }
                         else if(idx_menus[menuItem] == MENU_TYPE_LOAD){
                             MENU_DEBUG_PRINTF("Load Slot UP\n");
-                            menu_saveslot = (menu_saveslot+1)%MAX_SAVE_SLOTS;
+                            ++menu_saveslot;
 
                             /** Choose quick save file or standard saveslot for loading */
                             savestate_get_name(QUICKSAVE_SLOT, fname);
                             if(!quick_load_slot_chosen &&
-                                menu_saveslot == MAX_SAVE_SLOTS-1 &&
+                                menu_saveslot == MAX_SAVE_SLOTS &&
                                 file_exists_home(fname)){
                                 quick_load_slot_chosen = 1;
                             }
                             else if(quick_load_slot_chosen){
                                 quick_load_slot_chosen = 0;
                                 menu_saveslot = 0;
+                            }
+                            else {
+                                menu_saveslot = menu_saveslot%MAX_SAVE_SLOTS;
                             }
 
                             /// ------ Refresh screen ------
