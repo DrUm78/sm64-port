@@ -10,7 +10,7 @@
 #include "fsutils.h"
 
 #define SAVESTATE_FILENAME "sm64_savestate"
-#define SAVESTATE_VERSION 1
+#define SAVESTATE_VERSION 1 // PLEASE increment this for each new release
 
 extern char __data_start[];
 //extern char etext[];
@@ -52,7 +52,6 @@ void savestate_get_name(int slot, char* namebuffer) {
 
 FILE *fopen_slot(int slot, const char* mode) {
     char name[32];
-    FILE* ret;
 
     savestate_get_name(slot,name);
     return fopen_home(name,mode);

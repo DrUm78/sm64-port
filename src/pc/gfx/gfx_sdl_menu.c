@@ -84,7 +84,6 @@ static SDL_Surface ** menu_zone_surfaces __attribute__((section("dontsave"))) = 
 static int * idx_menus __attribute__((section("dontsave"))) = NULL;
 static int nb_menu_zones = 0;
 static int menuItem = 0;
-int stop_menu_loop = 0;
 
 static SDL_Color text_color = {GRAY_MAIN_R, GRAY_MAIN_G, GRAY_MAIN_B};
 static int padding_y_from_center_menu_zone = 18;
@@ -617,7 +616,7 @@ void run_menu_loop()
     uint8_t screen_refresh = 1;
     char shell_cmd[100];
     uint8_t menu_confirmation = 0;
-    stop_menu_loop = 0;
+    int stop_menu_loop = 0;
     char fname[MAXPATHLEN];
 
     /// ------ Load default keymap ------

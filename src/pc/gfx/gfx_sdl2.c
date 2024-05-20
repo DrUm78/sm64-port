@@ -113,15 +113,15 @@ static bool (*on_key_up_callback)(int scancode);
 static void (*on_all_keys_up_callback)(void);
 
 // frameskip
-static bool do_render = true;
-static volatile uint32_t tick = 0;
-static uint32_t last = 0;
-static SDL_TimerID idTimer = 0;
+static bool do_render __attribute__((section("dontsave"))) = true;
+static volatile uint32_t tick __attribute__((section("dontsave"))) = 0;
+static uint32_t last __attribute__((section("dontsave"))) = 0;
+static SDL_TimerID idTimer __attribute__((section("dontsave"))) = 0;
 static Uint32 last_time __attribute__((section("dontsave"))) = 0;
 
 // fps stats tracking
-static int f_frames = 0;
-static double f_time = 0.0;
+static int f_frames __attribute__((section("dontsave"))) = 0;
+static double f_time __attribute__((section("dontsave"))) = 0.0;
 
 #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
 	uint32_t *gfx_output __attribute__((section("dontsave")));
@@ -501,6 +501,7 @@ static void gfx_sdl_handle_events(void) {
                   run_menu_loop();
                   clear_screen(texture);
                   last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
+                  last = tick; // same
                   break;
 
                   // case SDLK_h:
