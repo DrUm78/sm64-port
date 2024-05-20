@@ -35,6 +35,10 @@ static int savestate_request=0;
 static void* memstart = __data_start;
 static void* memstop = end;
 
+// data section to not save
+extern char __start_dontsave[];
+extern char __stop_dontsave[];
+
 FILE *fopen_slot(int slot, const char* mode) {
     char* name;
     FILE* ret;
@@ -93,6 +97,9 @@ void tryload(int slot) {
     size_t bss_size_read;
     uint32_t texcache_size_read;
 
+    void* preserve;
+    const size_t preserve_size = __stop_dontsave - __start_dontsave;
+
     printf("Loading state %d...\n", slot);
 
     f = fopen_slot(slot,"r");
@@ -118,6 +125,10 @@ void tryload(int slot) {
     // I can't think of any sanity check for the texture cache
     fread(&texcache_size_read, sizeof texcache_size_read, 1, f);
 
+    // preserve some values
+    preserve = malloc(preserve_size);
+    memcpy(preserve, __start_dontsave, preserve_size);
+
     // finally some important reading
     free(texcache); // free the current texcache before its pointer becomes corrupted
     SDL_LockAudio();
@@ -126,6 +137,10 @@ void tryload(int slot) {
     texcache_size = texcache_size_read;
     texcache = malloc(texcache_size);
     fread(texcache,sizeof(char),texcache_size,f);
+
+    // restore preserved values
+    memcpy(__start_dontsave, preserve, preserve_size);
+    free(preserve);
 
     // end it all
     if (fclose(f)==0) {

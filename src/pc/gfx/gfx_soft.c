@@ -154,7 +154,7 @@ static Color4 fog_color; // this is set by set_fog_color() calls from gfx_pc
 static bool z_test;        // whether to perform depth testing
 static bool z_write;       // whether to write into the Z buffer
 static float z_offset;     // offset for decal mode
-static uint16_t *z_buffer;
+static uint16_t *z_buffer __attribute__((section("dontsave")));
 
 static int scr_width;
 static int scr_height;

@@ -76,12 +76,8 @@
 #ifdef ENABLE_SOFTRAST
 #define GFX_API_NAME "SDL1.2 - Software"
 #include "gfx_soft.h"
-//static SDL_Renderer *renderer;
-SDL_Surface *sdl_screen = NULL;
-SDL_PixelFormat sdl_screen_bgr;
-static SDL_Surface *buffer = NULL;
-SDL_Surface *texture = NULL;
-//static SDL_Texture *texture = NULL;
+SDL_Surface *sdl_screen __attribute__((section("dontsave"))) = NULL;
+SDL_Surface *texture __attribute__((section("dontsave"))) = NULL;
 #else
 #define GFX_API_NAME "SDL2 - OpenGL"
 #endif
@@ -89,7 +85,7 @@ SDL_Surface *texture = NULL;
 // Handling subresolutions 
 #define SUB_RES_DIVIDER  6     //1 is just fullscreen
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
-static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS];
+static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] __attribute__((section("dontsave")));
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
 static bool fullscreen_state;
 //static bool half_res = false;
@@ -121,14 +117,14 @@ static bool do_render = true;
 static volatile uint32_t tick = 0;
 static uint32_t last = 0;
 static SDL_TimerID idTimer = 0;
-static Uint32 last_time = 0;
+static Uint32 last_time __attribute__((section("dontsave"))) = 0;
 
 // fps stats tracking
 static int f_frames = 0;
 static double f_time = 0.0;
 
 #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
-	uint32_t *gfx_output;
+	uint32_t *gfx_output __attribute__((section("dontsave")));
 #endif
 
 

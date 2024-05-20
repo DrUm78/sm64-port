@@ -69,18 +69,18 @@
 
 /// -------------- STATIC VARIABLES --------------
 extern SDL_Surface * texture;
-SDL_Surface * draw_screen;
+SDL_Surface * draw_screen __attribute__((section("dontsave"))) = NULL;
 
 static int backup_key_repeat_delay, backup_key_repeat_interval;
-static SDL_Surface * backup_hw_screen = NULL;
+static SDL_Surface * backup_hw_screen __attribute__((section("dontsave"))) = NULL;
 
-static TTF_Font *menu_title_font = NULL;
-static TTF_Font *menu_info_font = NULL;
-static TTF_Font *menu_small_info_font = NULL;
-static SDL_Surface *img_arrow_top = NULL;
-static SDL_Surface *img_arrow_bottom = NULL;
-static SDL_Surface ** menu_zone_surfaces = NULL;
-static int * idx_menus = NULL;
+static TTF_Font *menu_title_font __attribute__((section("dontsave"))) = NULL;
+static TTF_Font *menu_info_font __attribute__((section("dontsave"))) = NULL;
+static TTF_Font *menu_small_info_font __attribute__((section("dontsave"))) = NULL;
+static SDL_Surface *img_arrow_top __attribute__((section("dontsave"))) = NULL;
+static SDL_Surface *img_arrow_bottom __attribute__((section("dontsave"))) = NULL;
+static SDL_Surface ** menu_zone_surfaces __attribute__((section("dontsave"))) = NULL;
+static int * idx_menus __attribute__((section("dontsave"))) = NULL;
 static int nb_menu_zones = 0;
 static int menuItem = 0;
 int stop_menu_loop = 0;
