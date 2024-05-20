@@ -83,7 +83,7 @@ static SDL_Surface *img_arrow_bottom __attribute__((section("dontsave"))) = NULL
 static SDL_Surface ** menu_zone_surfaces __attribute__((section("dontsave"))) = NULL;
 static int * idx_menus __attribute__((section("dontsave"))) = NULL;
 static int nb_menu_zones = 0;
-static int menuItem = 0;
+static int menuItem __attribute__((section("dontsave"))) = 0;
 
 static SDL_Color text_color = {GRAY_MAIN_R, GRAY_MAIN_G, GRAY_MAIN_B};
 static int padding_y_from_center_menu_zone = 18;
@@ -99,6 +99,8 @@ int brightness_percentage = 0;
 
 int menu_saveslot __attribute__((section("dontsave"))) = 0;
 static int quick_load_slot_chosen __attribute__((section("dontsave"))) = 0;
+
+int stop_menu_loop __attribute__((section("dontsave"))) = 0;
 
 // #undef X
 // #define X(a, b) b,
@@ -616,7 +618,7 @@ void run_menu_loop()
     uint8_t screen_refresh = 1;
     char shell_cmd[100];
     uint8_t menu_confirmation = 0;
-    int stop_menu_loop = 0;
+    stop_menu_loop = 0;
     char fname[MAXPATHLEN];
 
     /// ------ Load default keymap ------
@@ -737,7 +739,7 @@ void run_menu_loop()
                             MENU_DEBUG_PRINTF("Load Slot DOWN\n");
 
                             /** Choose quick save file or standard saveslot for loading */
-                            savestate_get_name(-1, fname);
+                            savestate_get_name(QUICKSAVE_SLOT, fname);
                             if(!quick_load_slot_chosen &&
                                 menu_saveslot == 0 &&
                                 file_exists_home(fname)){
@@ -802,7 +804,7 @@ void run_menu_loop()
                             menu_saveslot = (menu_saveslot+1)%MAX_SAVE_SLOTS;
 
                             /** Choose quick save file or standard saveslot for loading */
-                            savestate_get_name(-1, fname);
+                            savestate_get_name(QUICKSAVE_SLOT, fname);
                             if(!quick_load_slot_chosen &&
                                 menu_saveslot == MAX_SAVE_SLOTS-1 &&
                                 file_exists_home(fname)){
@@ -856,7 +858,7 @@ void run_menu_loop()
 
                                 /// ------ Load game ------
                                 if(quick_load_slot_chosen){
-                                    savestate_request_load(-1);
+                                    savestate_request_load(QUICKSAVE_SLOT);
                                 }
                                 else{
                                     savestate_request_load(menu_saveslot+1);

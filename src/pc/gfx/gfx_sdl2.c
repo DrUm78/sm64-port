@@ -518,8 +518,13 @@ static void gfx_sdl_handle_events(void) {
                   // pclose(fp_tmp);
                   // break;
 
-// testing output of dynamics resolutions on desktop
 #ifdef DEBUG
+                  // testing quicksave on desktop
+                  case SDLK_F8:
+                    savestate_request_save(QUICKSAVE_SLOT);
+                  break;
+
+                  // testing output of dynamics resolutions on desktop
                   case SDLK_F11:
                     set_lowerRes(dichotomic_res_change, true);
                   break;

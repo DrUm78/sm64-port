@@ -8,6 +8,7 @@
 #include "SDL/SDL.h"
 
 #include "fsutils.h"
+#include "gfx/gfx_sdl_menu.h"
 
 #define SAVESTATE_FILENAME "sm64_savestate"
 #define SAVESTATE_VERSION 1 // PLEASE increment this for each new release
@@ -22,7 +23,7 @@ extern uint32_t texcache_size;
 
 static uint8_t *texcache_save=0;
 
-static int savestate_request=0;
+static int savestate_request __attribute__((section("dontsave"))) = 0;
 
 // found using pmap <pid>
 // everything seems constant, maybe not depending on the build
@@ -39,10 +40,12 @@ static void* memstop = end;
 extern char __start_dontsave[];
 extern char __stop_dontsave[];
 
+
+extern char *prog_name;
+
 // /!\/!\/!\ namebuffer size isn't checked /!\/!\/!
 void savestate_get_name(int slot, char* namebuffer) {
-    if (slot < 0) {
-        // let's have negative be a special value for the quick save slot
+    if (slot == QUICKSAVE_SLOT) {
         sprintf(namebuffer, "%s.quick", SAVESTATE_FILENAME);
     }
     else {
@@ -62,7 +65,28 @@ void trysave(int slot) {
     FILE* f;
     unsigned int version = SAVESTATE_VERSION;
 
-    printf("Saving state %d...\n", slot);
+    if (slot == QUICKSAVE_SLOT) {
+        printf("Save Instant Play file\n");
+
+        Uint32 start = SDL_GetTicks();
+
+        /* Send command to cancel any previously scheduled powerdown */
+        FILE* fp = popen(SHELL_CMD_POWERDOWN_HANDLE, "r");
+        if (fp == NULL)
+        {
+                /* Countdown is still ticking, so better do nothing
+                than start writing and get interrupted!
+            */
+            printf("Failed to cancel scheduled shutdown\n");
+            exit(0);
+        }
+        pclose(fp);
+
+        printf("============== Cancel time %d\n", SDL_GetTicks() - start);
+    }
+    else {
+        printf("Saving state %d...\n", slot);
+    }
 
     f = fopen_slot(slot,"w");
     if (!f) {
@@ -89,6 +113,18 @@ void trysave(int slot) {
     }
     else {
         printf("Unexpected error while saving state %d\n", slot);
+    }
+
+    if (slot == QUICKSAVE_SLOT) {
+        /* Perform Instant Play save and shutdown */
+        execlp(SHELL_CMD_INSTANT_PLAY, SHELL_CMD_INSTANT_PLAY,
+            "save", prog_name, "--quickResume", NULL);
+
+        /* Should not be reached */
+        printf("Failed to perform Instant Play save and shutdown\n");
+
+        /* Exit Emulator */
+        exit(0);
     }
 }
 

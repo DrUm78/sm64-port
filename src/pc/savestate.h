@@ -1,6 +1,8 @@
 #ifndef _SAVESTATE_H
 #define _SAVESTATE_H
 
+#define QUICKSAVE_SLOT 0xFFFF
+
 void savestate_check();
 
 void savestate_request_save(int slot);
