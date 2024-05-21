@@ -23,7 +23,7 @@ extern uint32_t texcache_size;
 
 static uint8_t *texcache_save=0;
 
-static int savestate_request __attribute__((section("dontsave"))) = 0;
+static int savestate_request SAVESTATE_EXCLUDE = 0;
 
 // found using pmap <pid>
 // everything seems constant, maybe not depending on the build

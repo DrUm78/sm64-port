@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <signal.h>
+#include <string.h>
 #ifdef TARGET_WEB
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -30,10 +31,9 @@
 
 #include "controller/controller_keyboard.h"
 
-#include "configfile.h"
-
 #include "compat.h"
 
+#include "configfile.h"
 #include "savestate.h"
 
 #define CONFIG_FILE "sm64config.txt"
@@ -52,7 +52,7 @@ static struct GfxWindowManagerAPI *wm_api;
 static struct GfxRenderingAPI *rendering_api;
 
 extern int stop_menu_loop;
-char *prog_name __attribute__((section("dontsave")));
+char *prog_name SAVESTATE_EXCLUDE;
 
 extern void gfx_run(Gfx *commands);
 extern void thread5_game_loop(void *arg);

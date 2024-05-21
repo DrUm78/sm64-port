@@ -70,20 +70,20 @@
 
 /// -------------- STATIC VARIABLES --------------
 extern SDL_Surface * texture;
-SDL_Surface * draw_screen __attribute__((section("dontsave"))) = NULL;
+SDL_Surface * draw_screen SAVESTATE_EXCLUDE = NULL;
 
 static int backup_key_repeat_delay, backup_key_repeat_interval;
-static SDL_Surface * backup_hw_screen __attribute__((section("dontsave"))) = NULL;
+static SDL_Surface * backup_hw_screen SAVESTATE_EXCLUDE = NULL;
 
-static TTF_Font *menu_title_font __attribute__((section("dontsave"))) = NULL;
-static TTF_Font *menu_info_font __attribute__((section("dontsave"))) = NULL;
-static TTF_Font *menu_small_info_font __attribute__((section("dontsave"))) = NULL;
-static SDL_Surface *img_arrow_top __attribute__((section("dontsave"))) = NULL;
-static SDL_Surface *img_arrow_bottom __attribute__((section("dontsave"))) = NULL;
-static SDL_Surface ** menu_zone_surfaces __attribute__((section("dontsave"))) = NULL;
-static int * idx_menus __attribute__((section("dontsave"))) = NULL;
+static TTF_Font *menu_title_font SAVESTATE_EXCLUDE = NULL;
+static TTF_Font *menu_info_font SAVESTATE_EXCLUDE = NULL;
+static TTF_Font *menu_small_info_font SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface *img_arrow_top SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface *img_arrow_bottom SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface ** menu_zone_surfaces SAVESTATE_EXCLUDE = NULL;
+static int * idx_menus SAVESTATE_EXCLUDE = NULL;
 static int nb_menu_zones = 0;
-static int menuItem __attribute__((section("dontsave"))) = 0;
+static int menuItem SAVESTATE_EXCLUDE = 0;
 
 static SDL_Color text_color = {GRAY_MAIN_R, GRAY_MAIN_G, GRAY_MAIN_B};
 static int padding_y_from_center_menu_zone = 18;
@@ -97,10 +97,10 @@ static uint16_t y_brightness_bar = 0;
 int volume_percentage = 0;
 int brightness_percentage = 0;
 
-int menu_saveslot __attribute__((section("dontsave"))) = 0;
-static int quick_load_slot_chosen __attribute__((section("dontsave"))) = 0;
+int menu_saveslot SAVESTATE_EXCLUDE = 0;
+static int quick_load_slot_chosen SAVESTATE_EXCLUDE = 0;
 
-int stop_menu_loop __attribute__((section("dontsave"))) = 0;
+int stop_menu_loop SAVESTATE_EXCLUDE = 0;
 
 // #undef X
 // #define X(a, b) b,

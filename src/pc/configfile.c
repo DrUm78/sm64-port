@@ -8,6 +8,7 @@
 
 #include "configfile.h"
 #include "fsutils.h"
+#include "savestate.h"
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -30,7 +31,7 @@ struct ConfigOption {
 /*
  *Config options and default values
  */
-bool configFullscreen __attribute__((section("dontsave"))) = true;
+bool configFullscreen SAVESTATE_EXCLUDE = true;
 bool configDrawSky               = true;
 bool configFiltering             = false;
 bool configEnableSound           = true;

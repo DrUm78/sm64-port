@@ -76,8 +76,8 @@
 #ifdef ENABLE_SOFTRAST
 #define GFX_API_NAME "SDL1.2 - Software"
 #include "gfx_soft.h"
-SDL_Surface *sdl_screen __attribute__((section("dontsave"))) = NULL;
-SDL_Surface *texture __attribute__((section("dontsave"))) = NULL;
+SDL_Surface *sdl_screen SAVESTATE_EXCLUDE = NULL;
+SDL_Surface *texture SAVESTATE_EXCLUDE = NULL;
 #else
 #define GFX_API_NAME "SDL2 - OpenGL"
 #endif
@@ -85,19 +85,19 @@ SDL_Surface *texture __attribute__((section("dontsave"))) = NULL;
 // Handling subresolutions 
 #define SUB_RES_DIVIDER  6     //1 is just fullscreen
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
-static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] __attribute__((section("dontsave")));
+static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] SAVESTATE_EXCLUDE;
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
-static bool fullscreen_state __attribute__((section("dontsave")));
+static bool fullscreen_state SAVESTATE_EXCLUDE;
 //static bool half_res = false;
-static int current_res_idx __attribute__((section("dontsave"))) = 0;
+static int current_res_idx SAVESTATE_EXCLUDE = 0;
 
 // time between consecutive game frames
 const int frame_time = 1000 / FRAMERATE;
-static int too_slow_in_a_row __attribute__((section("dontsave"))) = 0;
-static int fast_speed_in_a_row __attribute__((section("dontsave"))) = 0;
-static int elapsed_time_avg __attribute__((section("dontsave"))) = 0;
-static int elapsed_time_cnt __attribute__((section("dontsave"))) = 0;
-static bool dichotomic_res_change __attribute__((section("dontsave"))) = true;
+static int too_slow_in_a_row SAVESTATE_EXCLUDE = 0;
+static int fast_speed_in_a_row SAVESTATE_EXCLUDE = 0;
+static int elapsed_time_avg SAVESTATE_EXCLUDE = 0;
+static int elapsed_time_cnt SAVESTATE_EXCLUDE = 0;
+static bool dichotomic_res_change SAVESTATE_EXCLUDE = true;
 #define MAX_AVG_ELAPSED_TIME_COUNTS 3
 #define MAX_TOO_SLOW_IN_A_ROW       3
 #define MAX_FAST_SPEED_IN_A_ROW   3
@@ -105,26 +105,26 @@ static bool dichotomic_res_change __attribute__((section("dontsave"))) = true;
 //static SDL_Window *wnd;
 static int inverted_scancode_table[512];
 static int vsync_enabled = 0;
-static unsigned int window_width __attribute__((section("dontsave"))) = DESIRED_SCREEN_WIDTH;
-static unsigned int window_height __attribute__((section("dontsave"))) = DESIRED_SCREEN_HEIGHT;
+static unsigned int window_width SAVESTATE_EXCLUDE = DESIRED_SCREEN_WIDTH;
+static unsigned int window_height SAVESTATE_EXCLUDE = DESIRED_SCREEN_HEIGHT;
 static void (*on_fullscreen_changed_callback)(bool is_now_fullscreen);
 static bool (*on_key_down_callback)(int scancode);
 static bool (*on_key_up_callback)(int scancode);
 static void (*on_all_keys_up_callback)(void);
 
 // frameskip
-static bool do_render __attribute__((section("dontsave"))) = true;
-static volatile uint32_t tick __attribute__((section("dontsave"))) = 0;
-static uint32_t last __attribute__((section("dontsave"))) = 0;
-static SDL_TimerID idTimer __attribute__((section("dontsave"))) = 0;
-static Uint32 last_time __attribute__((section("dontsave"))) = 0;
+static bool do_render SAVESTATE_EXCLUDE = true;
+static volatile uint32_t tick SAVESTATE_EXCLUDE = 0;
+static uint32_t last SAVESTATE_EXCLUDE = 0;
+static SDL_TimerID idTimer SAVESTATE_EXCLUDE = 0;
+static Uint32 last_time SAVESTATE_EXCLUDE = 0;
 
 // fps stats tracking
-static int f_frames __attribute__((section("dontsave"))) = 0;
-static double f_time __attribute__((section("dontsave"))) = 0.0;
+static int f_frames SAVESTATE_EXCLUDE = 0;
+static double f_time SAVESTATE_EXCLUDE = 0.0;
 
 // #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
-// 	uint32_t *gfx_output __attribute__((section("dontsave")));
+// 	uint32_t *gfx_output SAVESTATE_EXCLUDE;
 // #endif
 
 

@@ -2,6 +2,7 @@
 #define _SAVESTATE_H
 
 #define QUICKSAVE_SLOT 0xFFFF
+#define SAVESTATE_EXCLUDE __attribute__((section("dontsave")))
 
 void savestate_check();
 
