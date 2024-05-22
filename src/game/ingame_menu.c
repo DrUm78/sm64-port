@@ -101,6 +101,17 @@ u8 gDialogCharWidths[256] = { // TODO: Is there a way to auto generate this?
 };
 #endif
 
+// custom command to tell the graphics to go full resolution
+#ifdef ENABLE_SOFTRAST
+    #define FLIP_TO_FULLSCREEN { \
+        Gfx *_g = (Gfx *)gDisplayListHead++; \
+        _g->words.w0 = _SHIFTL(0x10, 24, 8); /* I think 0x10 isn't used*/ \
+        _g->words.w1 = 0; \
+    }
+#else
+    #define FLIP_TO_FULLSCREEN
+#endif
+
 s8 gDialogBoxState = DIALOG_STATE_OPENING;
 f32 gDialogBoxOpenTimer = DEFAULT_DIALOG_BOX_ANGLE;
 f32 gDialogBoxScale = DEFAULT_DIALOG_BOX_SCALE;
@@ -235,8 +246,7 @@ static u8 *alloc_ia8_text_from_i1(u16 *in, s16 width, s16 height) {
 }
 
 void render_generic_char(u8 c) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
+    FLIP_TO_FULLSCREEN
 
     void **fontLUT;
     void *packedTexture;
@@ -295,8 +305,7 @@ u8 *alloc_ia4_tex_from_i1(u8 *in, s16 width, s16 height) {
 }
 
 void render_generic_char_at_pos(s16 xPos, s16 yPos, u8 c) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
+    FLIP_TO_FULLSCREEN
     
     void **fontLUT;
     void *packedTexture;
@@ -523,9 +532,8 @@ void print_generic_string(s16 x, s16 y, const u8 *str) {
 
 #ifdef VERSION_EU
 void print_hud_char_umlaut(s16 x, s16 y, u8 chr) {
-    //DEBUG_TEXT_PRINTF("%s\n", __func__);
-    //text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     void **fontLUT = segmented_to_virtual(main_hud_lut);
 
     gDPPipeSync(gDisplayListHead++);
@@ -543,9 +551,8 @@ void print_hud_char_umlaut(s16 x, s16 y, u8 chr) {
  * Prints a hud string depending of the hud table list defined.
  */
 void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
-    //DEBUG_TEXT_PRINTF("%s\n", __func__);
-    //text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     s32 strPos = 0;
     void **hudLUT1 = segmented_to_virtual(menu_hud_lut); // Japanese Menu HUD Color font
     void **hudLUT2 = segmented_to_virtual(main_hud_lut); // 0-9 A-Z HUD Color Font
@@ -619,9 +626,8 @@ void print_hud_lut_string(s8 hudLUT, s16 x, s16 y, const u8 *str) {
 
 #ifdef VERSION_EU
 void print_menu_char_umlaut(s16 x, s16 y, u8 chr) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     void **fontLUT = segmented_to_virtual(menu_font_lut);
 
     gDPSetTextureImage(gDisplayListHead++, G_IM_FMT_IA, G_IM_SIZ_8b, 1, fontLUT[chr]);
@@ -637,9 +643,8 @@ void print_menu_char_umlaut(s16 x, s16 y, u8 chr) {
 #endif
 
 void print_menu_generic_string(s16 x, s16 y, const u8 *str) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     UNUSED s8 mark = DIALOG_MARK_NONE; // unused in EU
     s32 strPos = 0;
     s32 curX = x;
@@ -701,9 +706,8 @@ void print_menu_generic_string(s16 x, s16 y, const u8 *str) {
 }
 
 void print_credits_string(s16 x, s16 y, const u8 *str) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     s32 strPos = 0;
     void **fontLUT = segmented_to_virtual(main_credits_font_lut);
     u32 curX = x;
@@ -1025,9 +1029,8 @@ void change_and_flash_dialog_text_color_lines(s8 colorMode, s8 lineNum) {
 
 #ifdef VERSION_EU
 void render_generic_dialog_char_at_pos(struct DialogEntry *dialog, s16 x, s16 y, u8 c) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     s16 width;
     s16 height;
     s16 tmpX;
@@ -1226,9 +1229,8 @@ void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog)
 void handle_dialog_text_and_pages(s8 colorMode, struct DialogEntry *dialog, s8 lowerBound)
 #endif
 {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     UNUSED s32 pad[2];
 #ifdef VERSION_EU
     s16 startY = 14;
@@ -1703,9 +1705,8 @@ s8 gDialogCourseActNum = 1;
 #endif
 
 void render_dialog_entries(void) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
 #ifdef VERSION_EU
     s8 lowerBound;
 #endif
@@ -2038,9 +2039,8 @@ void do_cutscene_handler(void) {
 
 // "Dear Mario" message handler
 void print_peach_letter_message(void) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
     void **dialogTable;
     struct DialogEntry *dialog;
     u8 *str;
@@ -2230,9 +2230,8 @@ u8 gTextCourseArr[][7] = {
 #endif
 
 void render_pause_my_score_coins(void) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
 #ifdef VERSION_EU
     u8 textMyScore[][10] = {
         { TEXT_MY_SCORE },
@@ -2545,9 +2544,8 @@ void render_pause_castle_course_stars(s16 x, s16 y, s16 fileNum, s16 courseNum) 
 }
 
 void render_pause_castle_main_strings(s16 x, s16 y) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
-    
+    FLIP_TO_FULLSCREEN
+
 #ifdef VERSION_EU
     void **courseNameTbl;
 #else
@@ -2850,8 +2848,7 @@ void play_star_fanfare_and_flash_hud(s32 arg, u8 starNum) {
 #endif
 
 void render_course_complete_lvl_info_and_hud_str(void) {
-    DEBUG_TEXT_PRINTF("%s\n", __func__);
-    text_rendered = true;
+    FLIP_TO_FULLSCREEN
     
 #if defined(VERSION_JP) || defined(VERSION_SH)
     u8 textSymStar[] = { GLYPH_STAR, GLYPH_SPACE };

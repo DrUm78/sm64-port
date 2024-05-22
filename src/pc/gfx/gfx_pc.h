@@ -30,8 +30,6 @@ void gfx_run(Gfx *commands);
 void gfx_end_frame(void);
 void gfx_update_dimensions(void);
 
-extern bool text_rendered;
-
 #ifdef __cplusplus
 }
 #endif

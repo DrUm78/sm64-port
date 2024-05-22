@@ -187,8 +187,6 @@ static float inv_ratio_y = 1.f;
 
 static bool dropped_frame;
 
-bool text_rendered = false;
-
 static float buf_vbo[MAX_BUFFERED * (26 * 3)]; // 3 vertices in a triangle and 26 floats per vtx
 static size_t buf_vbo_len;
 static size_t buf_vbo_num_tris;
@@ -196,6 +194,7 @@ static size_t buf_vbo_num_tris;
 static struct GfxWindowManagerAPI *gfx_wapi;
 static struct GfxRenderingAPI *gfx_rapi;
 
+static bool fullscreen_command_called;
 
 static void gfx_recalc_dimensions(void) {
     gfx_wapi->get_dimensions(&gfx_current_dimensions.width, &gfx_current_dimensions.height);
@@ -208,7 +207,6 @@ static void gfx_recalc_dimensions(void) {
     inv_ratio_x = (float)SCREEN_WIDTH / (float)gfx_current_dimensions.width;
     inv_ratio_y = (float)SCREEN_HEIGHT / (float)gfx_current_dimensions.height;
     gfx_current_dimensions.aspect_ratio = (float)gfx_current_dimensions.width / (float)gfx_current_dimensions.height;
-    text_rendered = false;
 }
 
 static void gfx_flush(void) {
@@ -1779,16 +1777,19 @@ static void gfx_run_dl(Gfx* cmd) {
                 break;
 #ifdef ENABLE_SOFTRAST
             case 0x10: // custom command to go full resolution for the HUD
-                gfx_flush();
-                gfx_sdl_upscale_to_fullscreen();
-                gfx_recalc_dimensions();
-                rdp.viewport.x = 0;
-                rdp.viewport.y = 0;
-                rdp.viewport.width = 320;
-                rdp.viewport.height = 240;
-                rdp.scissor = rdp.viewport;
-                rdp.viewport_or_scissor_changed = true;
-                break;
+                if (!fullscreen_command_called) {
+                    fullscreen_command_called = true;
+                    gfx_flush();
+                    gfx_sdl_upscale_to_fullscreen();
+                    gfx_recalc_dimensions();
+                    rdp.viewport.x = 0;
+                    rdp.viewport.y = 0;
+                    rdp.viewport.width = 320;
+                    rdp.viewport.height = 240;
+                    rdp.scissor = rdp.viewport;
+                    rdp.viewport_or_scissor_changed = true;
+                    break;
+                }
 #endif
         }
         ++cmd;
@@ -1865,6 +1866,7 @@ struct GfxRenderingAPI *gfx_get_current_rendering_api(void) {
 void gfx_start_frame(void) {
     gfx_wapi->handle_events();
     gfx_recalc_dimensions();
+    fullscreen_command_called = false;
 }
 
 void gfx_run(Gfx *commands) {
@@ -1890,9 +1892,6 @@ void gfx_end_frame(void) {
     if (!dropped_frame) {
         gfx_rapi->finish_render();
 
-#ifdef FUNKEY
-        gfx_wapi->set_fullscreen(text_rendered);
-#endif
         gfx_wapi->swap_buffers_end();
     }
 }

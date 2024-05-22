@@ -89,7 +89,6 @@ SDL_Surface *texture SAVESTATE_EXCLUDE = NULL;
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
 static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] SAVESTATE_EXCLUDE;
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
-static bool fullscreen_state SAVESTATE_EXCLUDE;
 //static bool half_res = false;
 static int current_res_idx SAVESTATE_EXCLUDE = 0;
 
@@ -239,11 +238,6 @@ static void set_lowerRes(bool dichotomic, bool call_callback) {
 }
 
 static void set_fullscreen(bool on, bool call_callback) {
-  if (fullscreen_state == on) {
-      return;
-  }
-  fullscreen_state = on;
-
 #ifndef ENABLE_SOFTRAST
   if (on) {
       SDL_DisplayMode mode;
@@ -1165,18 +1159,12 @@ static void gfx_sdl_swap_buffers_end(void) {
     // let F11 and F12 control this for testing when debugging
 #ifndef DEBUG
     if(NB_SUBRESOLUTIONS > 1){
-        if( (fast_speed_in_a_row >= MAX_FAST_SPEED_IN_A_ROW || fullscreen_state) && current_res_idx != 0){
-          
-          /** Forcing full resolution */
-          if(fullscreen_state){
-            DEBUG_ADAPTATIVE_RES_PRINTF("Forcing full res (text displayed)\n");
-            current_res_idx = 0;
-          }
+        if( (fast_speed_in_a_row >= MAX_FAST_SPEED_IN_A_ROW) && current_res_idx != 0){
 
           fast_speed_in_a_row = 0;
           set_higherRes(dichotomic_res_change, true);
         }
-        else if(too_slow_in_a_row >= MAX_TOO_SLOW_IN_A_ROW && !fullscreen_state && (current_res_idx < NB_SUBRESOLUTIONS-1) ){
+        else if(too_slow_in_a_row >= MAX_TOO_SLOW_IN_A_ROW && (current_res_idx < NB_SUBRESOLUTIONS-1) ){
           
           too_slow_in_a_row = 0;
           set_lowerRes(dichotomic_res_change, true);

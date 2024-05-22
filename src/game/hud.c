@@ -339,8 +339,6 @@ void render_hud_timer(void) {
     u16 timerSecs;
     u16 timerFracSecs;
 
-    //text_rendered = true;
-
     hudLUT = segmented_to_virtual(&main_hud_lut);
     timerValFrames = gHudDisplay.timer;
 #ifdef VERSION_EU
