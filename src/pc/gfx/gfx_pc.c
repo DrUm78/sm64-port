@@ -196,6 +196,21 @@ static size_t buf_vbo_num_tris;
 static struct GfxWindowManagerAPI *gfx_wapi;
 static struct GfxRenderingAPI *gfx_rapi;
 
+
+static void gfx_recalc_dimensions(void) {
+    gfx_wapi->get_dimensions(&gfx_current_dimensions.width, &gfx_current_dimensions.height);
+    if (gfx_current_dimensions.height == 0) {
+        // Avoid division by zero
+        gfx_current_dimensions.height = 1;
+    }
+    ratio_x = (float)gfx_current_dimensions.width / (float)SCREEN_WIDTH;
+    ratio_y = (float)gfx_current_dimensions.height / (float)SCREEN_HEIGHT;
+    inv_ratio_x = (float)SCREEN_WIDTH / (float)gfx_current_dimensions.width;
+    inv_ratio_y = (float)SCREEN_HEIGHT / (float)gfx_current_dimensions.height;
+    gfx_current_dimensions.aspect_ratio = (float)gfx_current_dimensions.width / (float)gfx_current_dimensions.height;
+    text_rendered = false;
+}
+
 static void gfx_flush(void) {
     if (buf_vbo_len > 0) {
         int num = buf_vbo_num_tris;
@@ -1431,6 +1446,7 @@ static void gfx_draw_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lr
     }
 }
 
+void gfx_sdl_upscale_to_fullscreen(void);
 static void gfx_dp_texture_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t lry, uint8_t tile, int16_t uls, int16_t ult, int16_t dsdx, int16_t dtdy, bool flip) {
     uint32_t saved_combine_mode = rdp.combine_mode;
     if ((rdp.other_mode_h & (3U << G_MDSFT_CYCLETYPE)) == G_CYC_COPY) {
@@ -1761,6 +1777,19 @@ static void gfx_run_dl(Gfx* cmd) {
             case G_SETCIMG:
                 gfx_dp_set_color_image(C0(21, 3), C0(19, 2), C0(0, 11), seg_addr(cmd->words.w1));
                 break;
+#ifdef ENABLE_SOFTRAST
+            case 0x10: // custom command to go full resolution for the HUD
+                gfx_flush();
+                gfx_sdl_upscale_to_fullscreen();
+                gfx_recalc_dimensions();
+                rdp.viewport.x = 0;
+                rdp.viewport.y = 0;
+                rdp.viewport.width = 320;
+                rdp.viewport.height = 240;
+                rdp.scissor = rdp.viewport;
+                rdp.viewport_or_scissor_changed = true;
+                break;
+#endif
         }
         ++cmd;
     }
@@ -1835,17 +1864,7 @@ struct GfxRenderingAPI *gfx_get_current_rendering_api(void) {
 
 void gfx_start_frame(void) {
     gfx_wapi->handle_events();
-    gfx_wapi->get_dimensions(&gfx_current_dimensions.width, &gfx_current_dimensions.height);
-    if (gfx_current_dimensions.height == 0) {
-        // Avoid division by zero
-        gfx_current_dimensions.height = 1;
-    }
-    ratio_x = (float)gfx_current_dimensions.width / (float)SCREEN_WIDTH;
-    ratio_y = (float)gfx_current_dimensions.height / (float)SCREEN_HEIGHT;
-    inv_ratio_x = (float)SCREEN_WIDTH / (float)gfx_current_dimensions.width;
-    inv_ratio_y = (float)SCREEN_HEIGHT / (float)gfx_current_dimensions.height;
-    gfx_current_dimensions.aspect_ratio = (float)gfx_current_dimensions.width / (float)gfx_current_dimensions.height;
-    text_rendered = false;
+    gfx_recalc_dimensions();
 }
 
 void gfx_run(Gfx *commands) {

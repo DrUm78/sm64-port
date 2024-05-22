@@ -436,6 +436,15 @@ void render_hud(void) {
 
     hudDisplayFlags = gHudDisplay.flags;
 
+#ifdef ENABLE_SOFTRAST
+    // custom command to tell the graphics to go full resolution
+    {
+	    Gfx *_g = (Gfx *)gDisplayListHead++;
+        _g->words.w0 = _SHIFTL(0x10, 24, 8); // I think 0x10 isn't used
+        _g->words.w1 = 0;
+    }
+#endif
+
     if (hudDisplayFlags == HUD_DISPLAY_NONE) {
         sPowerMeterHUD.animation = POWER_METER_HIDDEN;
         sPowerMeterStoredHealth = 8;
