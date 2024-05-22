@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <signal.h>
+#include <string.h>
 #ifdef TARGET_WEB
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -29,9 +31,10 @@
 
 #include "controller/controller_keyboard.h"
 
-#include "configfile.h"
-
 #include "compat.h"
+
+#include "configfile.h"
+#include "savestate.h"
 
 #define CONFIG_FILE "sm64config.txt"
 
@@ -47,6 +50,9 @@ s8 gShowDebugText;
 static struct AudioAPI *audio_api;
 static struct GfxWindowManagerAPI *wm_api;
 static struct GfxRenderingAPI *rendering_api;
+
+extern int stop_menu_loop;
+char *prog_name SAVESTATE_EXCLUDE;
 
 extern void gfx_run(Gfx *commands);
 extern void thread5_game_loop(void *arg);
@@ -94,6 +100,7 @@ void produce_one_frame(void) {
     }
 
     gfx_end_frame();
+    savestate_check();
 }
 
 #ifdef TARGET_WEB
@@ -144,6 +151,18 @@ void game_exit(void) {
     exit(0);
 }
 
+/* Handler for SIGUSR1, caused by closing the console */
+void handle_sigusr1(int sig)
+{
+	//printf("Caught signal USR1 %d\n", sig);
+
+	/* Exit menu if it was launched */
+	stop_menu_loop = 1;
+
+	/* Signal to quick save and poweoff after next loop */
+	savestate_request_save(QUICKSAVE_SLOT);
+}
+
 void main_func(void) {
     static u64 pool[0x165000/8 / 4 * sizeof(void *)];
     main_pool_init(pool, pool + sizeof(pool) / sizeof(pool[0]));
@@ -151,6 +170,9 @@ void main_func(void) {
 
     configfile_load(CONFIG_FILE);
     atexit(save_config);
+
+    /* Init USR1 Signal (for quick save and poweroff) */
+	signal(SIGUSR1, handle_sigusr1);
 
 #ifdef TARGET_WEB
     emscripten_set_main_loop(em_main_loop, 0, 0);
@@ -247,6 +269,12 @@ int WINAPI WinMain(UNUSED HINSTANCE hInstance, UNUSED HINSTANCE hPrevInstance, U
 }
 #else
 int main(UNUSED int argc, UNUSED char *argv[]) {
+    prog_name = argv[0];
+    for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--quickResume")) {
+            savestate_request_load(QUICKSAVE_SLOT);
+        }
+    }
     main_func();
     return 0;
 }

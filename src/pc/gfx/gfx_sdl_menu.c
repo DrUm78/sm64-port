@@ -9,7 +9,8 @@
 
 #include "../common.h"
 #include "gfx_sdl_menu.h"
-
+#include "../savestate.h"
+#include "../fsutils.h"
 
 
 /// -------------- DEFINES --------------
@@ -69,21 +70,20 @@
 
 /// -------------- STATIC VARIABLES --------------
 extern SDL_Surface * texture;
-SDL_Surface * draw_screen;
+SDL_Surface * draw_screen SAVESTATE_EXCLUDE = NULL;
 
 static int backup_key_repeat_delay, backup_key_repeat_interval;
-static SDL_Surface * backup_hw_screen = NULL;
+static SDL_Surface * backup_hw_screen SAVESTATE_EXCLUDE = NULL;
 
-static TTF_Font *menu_title_font = NULL;
-static TTF_Font *menu_info_font = NULL;
-static TTF_Font *menu_small_info_font = NULL;
-static SDL_Surface *img_arrow_top = NULL;
-static SDL_Surface *img_arrow_bottom = NULL;
-static SDL_Surface ** menu_zone_surfaces = NULL;
-static int * idx_menus = NULL;
+static TTF_Font *menu_title_font SAVESTATE_EXCLUDE = NULL;
+static TTF_Font *menu_info_font SAVESTATE_EXCLUDE = NULL;
+static TTF_Font *menu_small_info_font SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface *img_arrow_top SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface *img_arrow_bottom SAVESTATE_EXCLUDE = NULL;
+static SDL_Surface ** menu_zone_surfaces SAVESTATE_EXCLUDE = NULL;
+static int * idx_menus SAVESTATE_EXCLUDE = NULL;
 static int nb_menu_zones = 0;
-static int menuItem = 0;
-int stop_menu_loop = 0;
+static int menuItem SAVESTATE_EXCLUDE = 0;
 
 static SDL_Color text_color = {GRAY_MAIN_R, GRAY_MAIN_G, GRAY_MAIN_B};
 static int padding_y_from_center_menu_zone = 18;
@@ -96,6 +96,11 @@ static uint16_t y_brightness_bar = 0;
 
 int volume_percentage = 0;
 int brightness_percentage = 0;
+
+int menu_saveslot SAVESTATE_EXCLUDE = 0;
+static int quick_load_slot_chosen SAVESTATE_EXCLUDE = 0;
+
+int stop_menu_loop SAVESTATE_EXCLUDE = 0;
 
 // #undef X
 // #define X(a, b) b,
@@ -340,10 +345,10 @@ void init_menu_zones(){
     add_menu_zone(MENU_TYPE_BRIGHTNESS);
     
     /// Init Save Menu
-    //add_menu_zone(MENU_TYPE_SAVE);
+    add_menu_zone(MENU_TYPE_SAVE);
     
     /// Init Load Menu
-    //add_menu_zone(MENU_TYPE_LOAD);
+    add_menu_zone(MENU_TYPE_LOAD);
     
     /// Init Aspect Ratio Menu
     //add_menu_zone(MENU_TYPE_ASPECT_RATIO);
@@ -465,10 +470,9 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
                             width_progress_bar, height_progress_bar, brightness_percentage, 100/STEP_CHANGE_BRIGHTNESS);
             break;
 
-#if 0
         case MENU_TYPE_SAVE:
             /// ---- Write slot -----
-            sprintf(text_tmp, "IN SLOT   < %d >", savestate_slot+1);
+            sprintf(text_tmp, "IN SLOT   < %d >", menu_saveslot+1);
             text_surface = TTF_RenderText_Blended(menu_info_font, text_tmp, text_color);
             text_pos.x = (draw_screen->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
             text_pos.y = draw_screen->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2;
@@ -485,8 +489,8 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
                 }
                 else{
                     /// ---- Write current Save state ---- 
-                    strcpy(fname, FCEU_MakeFName(FCEUMKF_STATE,savestate_slot,NULL).c_str());
-                    if(file_exists(fname))
+                    savestate_get_name(menu_saveslot+1, fname);
+                    if(file_exists_home(fname))
                     {
                         printf("Found Save slot: %s\n", fname);
                         char *bname = basename(fname);
@@ -509,7 +513,7 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
                 sprintf(text_tmp, "FROM AUTO SAVE");
             }
             else{
-                sprintf(text_tmp, "FROM SLOT   < %d >", savestate_slot+1);
+                sprintf(text_tmp, "FROM SLOT   < %d >", menu_saveslot+1);
             }
             text_surface = TTF_RenderText_Blended(menu_info_font, text_tmp, text_color);
             text_pos.x = (draw_screen->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
@@ -531,8 +535,8 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
                     }
                     else{
                         /// ---- Write current Save state ---- 
-                        strcpy(fname, FCEU_MakeFName(FCEUMKF_STATE,savestate_slot,NULL).c_str());
-                        if(file_exists(fname))
+                        savestate_get_name(menu_saveslot+1, fname);
+                        if(file_exists_home(fname))
                         {
                             printf("Found Load slot: %s\n", basename(fname));
                             char *bname = basename(fname);
@@ -549,7 +553,6 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
             text_pos.y = draw_screen->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 + 2*padding_y_from_center_menu_zone;
             SDL_BlitSurface(text_surface, NULL, draw_screen, &text_pos);
             break;
-#endif //0
 
         // case MENU_TYPE_ASPECT_RATIO:
         //     sprintf(text_tmp, "<   %s   >", aspect_ratio_name[aspect_ratio]);
@@ -726,6 +729,33 @@ void run_menu_loop()
 			    /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
+                        else if(idx_menus[menuItem] == MENU_TYPE_SAVE){
+                            MENU_DEBUG_PRINTF("Save Slot DOWN\n");
+                            menu_saveslot = (!menu_saveslot)?(MAX_SAVE_SLOTS-1):(menu_saveslot-1);
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
+                        else if(idx_menus[menuItem] == MENU_TYPE_LOAD){
+                            MENU_DEBUG_PRINTF("Load Slot DOWN\n");
+
+                            /** Choose quick save file or standard saveslot for loading */
+                            savestate_get_name(QUICKSAVE_SLOT, fname);
+                            if(!quick_load_slot_chosen &&
+                                menu_saveslot == 0 &&
+                                file_exists_home(fname)){
+                                quick_load_slot_chosen = 1;
+                            }
+                            else if(quick_load_slot_chosen){
+                                quick_load_slot_chosen = 0;
+                                menu_saveslot = MAX_SAVE_SLOTS-1;
+                            }
+                            else{
+                                menu_saveslot = (!menu_saveslot)?(MAX_SAVE_SLOTS-1):(menu_saveslot-1);
+                            }
+
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
                         // else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
                         //     MENU_DEBUG_PRINTF("Aspect Ratio DOWN\n");
                         //     aspect_ratio = (!aspect_ratio)?(NB_ASPECT_RATIOS_TYPES-1):(aspect_ratio-1);
@@ -763,6 +793,34 @@ void run_menu_loop()
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
+                        else if(idx_menus[menuItem] == MENU_TYPE_SAVE){
+                            MENU_DEBUG_PRINTF("Save Slot UP\n");
+                            menu_saveslot = (menu_saveslot+1)%MAX_SAVE_SLOTS;
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
+                        else if(idx_menus[menuItem] == MENU_TYPE_LOAD){
+                            MENU_DEBUG_PRINTF("Load Slot UP\n");
+                            ++menu_saveslot;
+
+                            /** Choose quick save file or standard saveslot for loading */
+                            savestate_get_name(QUICKSAVE_SLOT, fname);
+                            if(!quick_load_slot_chosen &&
+                                menu_saveslot == MAX_SAVE_SLOTS &&
+                                file_exists_home(fname)){
+                                quick_load_slot_chosen = 1;
+                            }
+                            else if(quick_load_slot_chosen){
+                                quick_load_slot_chosen = 0;
+                                menu_saveslot = 0;
+                            }
+                            else {
+                                menu_saveslot = menu_saveslot%MAX_SAVE_SLOTS;
+                            }
+
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
                         // else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
                         //     MENU_DEBUG_PRINTF("Aspect Ratio UP\n");
                         //     aspect_ratio = (aspect_ratio+1)%NB_ASPECT_RATIOS_TYPES;
@@ -773,7 +831,62 @@ void run_menu_loop()
 
                     case SDLK_a:
                     case SDLK_RETURN:
-                        if(idx_menus[menuItem] == MENU_TYPE_EXIT){
+                    if(idx_menus[menuItem] == MENU_TYPE_SAVE){
+                            if(menu_confirmation){
+                                MENU_DEBUG_PRINTF("Saving in slot %d\n", menu_saveslot);
+                                /// ------ Refresh Screen -------
+                                menu_screen_refresh(menuItem, prevItem, scroll, menu_confirmation, 1);
+
+                                /// ------ Save game ------
+                                savestate_request_save(menu_saveslot+1);
+
+                                /// ----- Hud Msg -----
+                                //sprintf(shell_cmd, "%s %d \"        SAVED IN SLOT %d\"",
+                                //    SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP, menu_saveslot+1);
+                                //system(shell_cmd);
+                                stop_menu_loop = 1;
+                            }
+                            else{
+                                MENU_DEBUG_PRINTF("Save game - asking confirmation\n");
+                                menu_confirmation = 1;
+                                /// ------ Refresh screen ------
+                                screen_refresh = 1;
+                            }
+                        }
+                        else if(idx_menus[menuItem] == MENU_TYPE_LOAD){
+                            if(menu_confirmation){
+                                MENU_DEBUG_PRINTF("Loading in slot %d\n", menu_saveslot);
+                                /// ------ Refresh Screen -------
+                                menu_screen_refresh(menuItem, prevItem, scroll, menu_confirmation, 1);
+
+                                /// ------ Load game ------
+                                if(quick_load_slot_chosen){
+                                    savestate_request_load(QUICKSAVE_SLOT);
+                                }
+                                else{
+                                    savestate_request_load(menu_saveslot+1);
+                                }
+
+                                /// ----- Hud Msg -----
+                                // if(quick_load_slot_chosen){
+                                //     sprintf(shell_cmd, "%s %d \"     LOADED FROM AUTO SAVE\"",
+                                //         SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP);
+                                // }
+                                // else{
+                                //     sprintf(shell_cmd, "%s %d \"      LOADED FROM SLOT %d\"",
+                                //         SHELL_CMD_NOTIF_SET, NOTIF_SECONDS_DISP, menu_saveslot+1);
+                                // }
+                                // system(shell_cmd);
+                                stop_menu_loop = 1;
+                            }
+                            else{
+                                MENU_DEBUG_PRINTF("Save game - asking confirmation\n");
+                                menu_confirmation = 1;
+                                /// ------ Refresh screen ------
+                                screen_refresh = 1;
+                            }
+                        }
+                        else if(idx_menus[menuItem] == MENU_TYPE_EXIT){
                             MENU_DEBUG_PRINTF("Exit game\n");
                             if(menu_confirmation){
                                 MENU_DEBUG_PRINTF("Exit game - confirmed\n");

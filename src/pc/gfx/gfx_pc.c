@@ -17,6 +17,7 @@
 #include "gfx_screen_config.h"
 
 #include "pc/configfile.h"
+#include "../savestate.h"
 
 #define SUPPORT_CHECK(x) assert(x)
 
@@ -178,7 +179,7 @@ static struct RenderingState {
     struct TextureHashmapNode *textures[2];
 } rendering_state;
 
-struct GfxDimensions gfx_current_dimensions;
+struct GfxDimensions gfx_current_dimensions SAVESTATE_EXCLUDE;
 static float ratio_x = 1.f;
 static float ratio_y = 1.f;
 static float inv_ratio_x = 1.f;

@@ -18,6 +18,8 @@
 #include "gfx_cc.h"
 #include "macros.h"
 
+#include "../savestate.h"
+
 #define ALIGN(x, a) (((x) + (a - 1)) & ~(a - 1))
 
 #define MAX_TEXTURES 3072
@@ -120,9 +122,9 @@ struct ClipRect {
 
 #if !(defined(DIRECT_SDL) && defined(SDL_SURFACE))
 	#ifdef CONVERT
-	uint16_t *gfx_output;
+	uint16_t *gfx_output SAVESTATE_EXCLUDE;
 	#else
-	uint32_t *gfx_output;
+	uint32_t *gfx_output SAVESTATE_EXCLUDE;
 	#endif
 #endif
 
@@ -139,9 +141,9 @@ static uint32_t tex_num = 0; // amount of textures in cache
 static int cur_tmu = 0; // select tile (used only for uploading)
 
 // texture cache: linearly stores RGBA data of every cached texture
-static uint8_t *texcache;
+uint8_t *texcache;
 static uint32_t texcache_addr; // current offset into cache
-static uint32_t texcache_size; // cache capacity
+uint32_t texcache_size; // cache capacity
 
 static bool do_blend; // fragment blending toggle
 static bool do_clip;  // scissor toggle
@@ -154,11 +156,11 @@ static Color4 fog_color; // this is set by set_fog_color() calls from gfx_pc
 static bool z_test;        // whether to perform depth testing
 static bool z_write;       // whether to write into the Z buffer
 static float z_offset;     // offset for decal mode
-static uint16_t *z_buffer;
+static uint16_t *z_buffer SAVESTATE_EXCLUDE;
 
-static int scr_width;
-static int scr_height;
-static int scr_size; // scr_width * scr_height
+static int scr_width SAVESTATE_EXCLUDE;
+static int scr_height SAVESTATE_EXCLUDE;
+static int scr_size SAVESTATE_EXCLUDE; // scr_width * scr_height
 
 // color component interpolation table:
 // lerp(x, y, t) = x + (y - x) * t

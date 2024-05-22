@@ -29,6 +29,7 @@
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
 #include "gfx_sdl_menu.h"
+#include "../savestate.h"
 
 //#define DEBUG_ADAPTATIVE_RES
 #ifdef DEBUG_ADAPTATIVE_RES
@@ -75,12 +76,8 @@
 #ifdef ENABLE_SOFTRAST
 #define GFX_API_NAME "SDL1.2 - Software"
 #include "gfx_soft.h"
-//static SDL_Renderer *renderer;
-SDL_Surface *sdl_screen = NULL;
-SDL_PixelFormat sdl_screen_bgr;
-static SDL_Surface *buffer = NULL;
-SDL_Surface *texture = NULL;
-//static SDL_Texture *texture = NULL;
+SDL_Surface *sdl_screen SAVESTATE_EXCLUDE = NULL;
+SDL_Surface *texture SAVESTATE_EXCLUDE = NULL;
 #else
 #define GFX_API_NAME "SDL2 - OpenGL"
 #endif
@@ -88,19 +85,19 @@ SDL_Surface *texture = NULL;
 // Handling subresolutions 
 #define SUB_RES_DIVIDER  6     //1 is just fullscreen
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
-static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS];
+static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] SAVESTATE_EXCLUDE;
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
-static bool fullscreen_state;
+static bool fullscreen_state SAVESTATE_EXCLUDE;
 //static bool half_res = false;
-static int current_res_idx = 0;
+static int current_res_idx SAVESTATE_EXCLUDE = 0;
 
 // time between consecutive game frames
 const int frame_time = 1000 / FRAMERATE;
-static int too_slow_in_a_row = 0;
-static int fast_speed_in_a_row = 0;
-static int elapsed_time_avg = 0;
-static int elapsed_time_cnt = 0;
-static bool dichotomic_res_change = true;
+static int too_slow_in_a_row SAVESTATE_EXCLUDE = 0;
+static int fast_speed_in_a_row SAVESTATE_EXCLUDE = 0;
+static int elapsed_time_avg SAVESTATE_EXCLUDE = 0;
+static int elapsed_time_cnt SAVESTATE_EXCLUDE = 0;
+static bool dichotomic_res_change SAVESTATE_EXCLUDE = true;
 #define MAX_AVG_ELAPSED_TIME_COUNTS 3
 #define MAX_TOO_SLOW_IN_A_ROW       3
 #define MAX_FAST_SPEED_IN_A_ROW   3
@@ -108,27 +105,27 @@ static bool dichotomic_res_change = true;
 //static SDL_Window *wnd;
 static int inverted_scancode_table[512];
 static int vsync_enabled = 0;
-static unsigned int window_width = DESIRED_SCREEN_WIDTH;
-static unsigned int window_height = DESIRED_SCREEN_HEIGHT;
+static unsigned int window_width SAVESTATE_EXCLUDE = DESIRED_SCREEN_WIDTH;
+static unsigned int window_height SAVESTATE_EXCLUDE = DESIRED_SCREEN_HEIGHT;
 static void (*on_fullscreen_changed_callback)(bool is_now_fullscreen);
 static bool (*on_key_down_callback)(int scancode);
 static bool (*on_key_up_callback)(int scancode);
 static void (*on_all_keys_up_callback)(void);
 
 // frameskip
-static bool do_render = true;
-static volatile uint32_t tick = 0;
-static uint32_t last = 0;
-static SDL_TimerID idTimer = 0;
-static Uint32 last_time = 0;
+static bool do_render SAVESTATE_EXCLUDE = true;
+static volatile uint32_t tick SAVESTATE_EXCLUDE = 0;
+static uint32_t last SAVESTATE_EXCLUDE = 0;
+static SDL_TimerID idTimer SAVESTATE_EXCLUDE = 0;
+static Uint32 last_time SAVESTATE_EXCLUDE = 0;
 
 // fps stats tracking
-static int f_frames = 0;
-static double f_time = 0.0;
+static int f_frames SAVESTATE_EXCLUDE = 0;
+static double f_time SAVESTATE_EXCLUDE = 0.0;
 
-#if defined(DIRECT_SDL) && defined(SDL_SURFACE)
-	uint32_t *gfx_output;
-#endif
+// #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
+// 	uint32_t *gfx_output SAVESTATE_EXCLUDE;
+// #endif
 
 
 const SDLKey windows_scancode_table[] =
@@ -504,6 +501,7 @@ static void gfx_sdl_handle_events(void) {
                   run_menu_loop();
                   clear_screen(texture);
                   last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
+                  last = tick; // same
                   break;
 
                   // case SDLK_h:
@@ -520,8 +518,13 @@ static void gfx_sdl_handle_events(void) {
                   // pclose(fp_tmp);
                   // break;
 
-// testing output of dynamics resolutions on desktop
 #ifdef DEBUG
+                  // testing quicksave on desktop
+                  case SDLK_F8:
+                    savestate_request_save(QUICKSAVE_SLOT);
+                  break;
+
+                  // testing output of dynamics resolutions on desktop
                   case SDLK_F11:
                     set_lowerRes(dichotomic_res_change, true);
                   break;
