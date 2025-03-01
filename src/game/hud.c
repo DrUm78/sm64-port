@@ -304,9 +304,9 @@ void render_hud_stars(void) {
         return;
     }
 
-    /*if (gHudDisplay.stars < 100) {
-        showX = 1;
-    }*/
+//    if (gHudDisplay.stars < 100) {
+//        showX = 1;
+//    }
 
     print_text(GFX_DIMENSIONS_RECT_FROM_RIGHT_EDGE(HUD_STARS_X) - 23, HUD_TOP_Y, "-"); // 'Star' glyph
     if (showX == 1) {

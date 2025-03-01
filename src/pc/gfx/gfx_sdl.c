@@ -818,88 +818,88 @@ void upscale_160x120_to_240x240_bilinearish(SDL_Surface *src_surface, SDL_Surfac
 }
 
 
-void upscale_160x120_to_320x240_bilinearish_cropScreen(SDL_Surface *src_surface, SDL_Surface *dst_surface)
-{
-  if (src_surface->w != 160)
-  {
-    printf("src_surface->w (%d) != 160 \n", src_surface->w);
-    return;
-  }
-  if (src_surface->h != 120)
-  {
-    printf("src_surface->h (%d) != 120 \n", src_surface->h);
-    return;
-  }
+//void upscale_160x120_to_320x240_bilinearish_cropScreen(SDL_Surface *src_surface, SDL_Surface *dst_surface)
+//{
+//  if (src_surface->w != 160)
+//  {
+//    printf("src_surface->w (%d) != 160 \n", src_surface->w);
+//    return;
+//  }
+//  if (src_surface->h != 120)
+//  {
+//    printf("src_surface->h (%d) != 120 \n", src_surface->h);
+//    return;
+//  }
 
-  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
-  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels;
-  uint32_t x_src_padding = 20;
+//  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
+//  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels;
+//  uint32_t x_src_padding = 20;
 
-  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
-  // Horizontally: 320=80*4 160=80*2
-  // Vertically: 240=60*4 120=60*2
-  // Each block of 2*2 becomes 4x4.
-  uint32_t BlockX, BlockY;
-  uint32_t *BlockSrc;
-  uint32_t *BlockDst;
-  uint32_t _a, _b, _aaab, _abbb, _c, _d, _cccd, _cddd;
-  for (BlockY = 0; BlockY < 60; BlockY++)
-  {
-    BlockSrc = Src32 + BlockY * 160 * 2 + x_src_padding;
-    BlockDst = Dst32 + BlockY * 240 * 4;
-    for (BlockX = 0; BlockX < 80-x_src_padding; BlockX++)
-    {
-      /* Horizontaly:
-       * Before(2):
-       * (a)(b)
-       * After(3):
-       * (a)(aaab)(abbb)(b)
-       */
+//  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
+//  // Horizontally: 320=80*4 160=80*2
+//  // Vertically: 240=60*4 120=60*2
+//  // Each block of 2*2 becomes 4x4.
+//  uint32_t BlockX, BlockY;
+//  uint32_t *BlockSrc;
+//  uint32_t *BlockDst;
+//  uint32_t _a, _b, _aaab, _abbb, _c, _d, _cccd, _cddd;
+//  for (BlockY = 0; BlockY < 60; BlockY++)
+//  {
+//    BlockSrc = Src32 + BlockY * 160 * 2 + x_src_padding;
+//    BlockDst = Dst32 + BlockY * 240 * 4;
+//    for (BlockX = 0; BlockX < 80-x_src_padding; BlockX++)
+//    {
+//      /* Horizontaly:
+//       * Before(2):
+//       * (a)(b)
+//       * After(3):
+//       * (a)(aaab)(abbb)(b)
+//       */
 
-      /* Verticaly:
-       * Before(2):
-       * (1)(2)
-       * After(4):
-       * (1)(1112)(1222)(2)
-       */
+//      /* Verticaly:
+//       * Before(2):
+//       * (1)(2)
+//       * After(4):
+//       * (1)(1112)(1222)(2)
+//       */
 
-      // -- Line 1 --
-      _a = *(BlockSrc                          );
-      _b = *(BlockSrc                       + 1);
-      _aaab = Weight3_1( _a,  _b);
-      _abbb = Weight1_3( _a,  _b);
-      *(BlockDst                               ) = _a;
-      *(BlockDst                            + 1) = _aaab;
-      *(BlockDst                            + 2) = _abbb;
-      *(BlockDst                            + 3) = _b;
+//      // -- Line 1 --
+//      _a = *(BlockSrc                          );
+//      _b = *(BlockSrc                       + 1);
+//      _aaab = Weight3_1( _a,  _b);
+//      _abbb = Weight1_3( _a,  _b);
+//      *(BlockDst                               ) = _a;
+//      *(BlockDst                            + 1) = _aaab;
+//      *(BlockDst                            + 2) = _abbb;
+//      *(BlockDst                            + 3) = _b;
 
-      // -- Line 2 --
-      _c = *(BlockSrc             + 160 * 1    );
-      _d = *(BlockSrc             + 160 * 1 + 1);
-      _cccd = Weight3_1( _c,  _d);
-      _cddd = Weight1_3( _c,  _d);
-      *(BlockDst                  + 240 * 1    ) = Weight3_1(_a, _c);
-      *(BlockDst                  + 240 * 1 + 1) = Weight3_1(_aaab, _cccd);
-      *(BlockDst                  + 240 * 1 + 2) = Weight3_1(_abbb, _cddd);
-      *(BlockDst                  + 240 * 1 + 3) = Weight3_1(_b, _d);
+//      // -- Line 2 --
+//      _c = *(BlockSrc             + 160 * 1    );
+//      _d = *(BlockSrc             + 160 * 1 + 1);
+//      _cccd = Weight3_1( _c,  _d);
+//      _cddd = Weight1_3( _c,  _d);
+//      *(BlockDst                  + 240 * 1    ) = Weight3_1(_a, _c);
+//      *(BlockDst                  + 240 * 1 + 1) = Weight3_1(_aaab, _cccd);
+//      *(BlockDst                  + 240 * 1 + 2) = Weight3_1(_abbb, _cddd);
+//      *(BlockDst                  + 240 * 1 + 3) = Weight3_1(_b, _d);
 
-      // -- Line 3 --
-      *(BlockDst                  + 240 * 2    ) = Weight1_3(_a, _c);
-      *(BlockDst                  + 240 * 2 + 1) = Weight1_3(_aaab, _cccd);
-      *(BlockDst                  + 240 * 2 + 2) = Weight1_3(_abbb, _cddd);
-      *(BlockDst                  + 240 * 2 + 3) = Weight1_3(_b, _d);
+//      // -- Line 3 --
+//      *(BlockDst                  + 240 * 2    ) = Weight1_3(_a, _c);
+//      *(BlockDst                  + 240 * 2 + 1) = Weight1_3(_aaab, _cccd);
+//      *(BlockDst                  + 240 * 2 + 2) = Weight1_3(_abbb, _cddd);
+//      *(BlockDst                  + 240 * 2 + 3) = Weight1_3(_b, _d);
 
-      // -- Line 4 --
-      *(BlockDst                  + 240 * 3    ) = _c;
-      *(BlockDst                  + 240 * 3 + 1) = _cccd;
-      *(BlockDst                  + 240 * 3 + 2) = _cddd;
-      *(BlockDst                  + 240 * 3 + 3) = _d;
+//      // -- Line 4 --
+//      *(BlockDst                  + 240 * 3    ) = _c;
+//      *(BlockDst                  + 240 * 3 + 1) = _cccd;
+//      *(BlockDst                  + 240 * 3 + 2) = _cddd;
+//      *(BlockDst                  + 240 * 3 + 3) = _d;
 
-      BlockSrc += 2;
-      BlockDst += 4;
-    }
-  }
-}
+//      BlockSrc += 2;
+//      BlockDst += 4;
+//    }
+//  }
+//}
 
 
 /// Interpolation with left, right pixels, pseudo gaussian weighting for downscaling - operations on 32bits
@@ -1120,9 +1120,9 @@ void gfx_sdl_upscale_to_fullscreen(void) {
   if (current_res_idx==0) {
     return;
   }
-  else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-    upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, sdl_screen_subRes[0]);
-  }
+//  else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+//    upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, sdl_screen_subRes[0]);
+//  }
   else{
     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], sdl_screen_subRes[0], configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
   }
