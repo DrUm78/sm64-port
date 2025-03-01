@@ -1120,9 +1120,9 @@ void gfx_sdl_upscale_to_fullscreen(void) {
   if (current_res_idx==0) {
     return;
   }
-  else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
+  /*else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
     upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, sdl_screen_subRes[0]);
-  }
+  }*/
   else{
     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], sdl_screen_subRes[0], configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
   }
