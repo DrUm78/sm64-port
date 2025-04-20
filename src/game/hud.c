@@ -287,11 +287,7 @@ void render_hud_coins(void) {
     print_text_fmt_int(174, HUD_TOP_Y, "%d", gHudDisplay.coins);
 }
 
-#ifdef VERSION_JP
-#define HUD_STARS_X 73
-#else
 #define HUD_STARS_X 78
-#endif
 
 /**
  * Renders the amount of stars collected.

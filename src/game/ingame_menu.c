@@ -2508,6 +2508,8 @@ void print_hud_pause_colorful_str(void) {
 #ifdef VERSION_EU
     print_hud_lut_string(HUD_LUT_GLOBAL, get_str_x_pos_from_center_scale(
                          SCREEN_WIDTH / 2, textPause, 12.0f), 81, textPause);
+#elif VERSION_JP
+    print_hud_lut_string(HUD_LUT_GLOBAL, 123, 81, textPause);
 #else
     print_hud_lut_string(HUD_LUT_GLOBAL, 130, 81, textPause);
 #endif
