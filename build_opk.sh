@@ -14,7 +14,8 @@ make distclean
 if [ -e ./baserom.us.z64 ]; then
 	make -j16 VERSION=us
 	mksquashfs build/us_funkey/sm64.us.f3dex2e opk/sm64.png opk/sm64_us."$1".desktop sm64_us_v1.3_"$1".opk
-elif [ -e ./baserom.jp.z64 ]; then
+fi
+if [ -e ./baserom.jp.z64 ]; then
 	make -j16 VERSION=jp
 	mksquashfs build/jp_funkey/sm64.jp.f3dex2e opk/sm64.png opk/sm64_jp."$1".desktop sm64_jp_v1.3_"$1".opk
 fi

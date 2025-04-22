@@ -27,11 +27,8 @@
 
 // Envelopes are always stored as big endian, to match sequence files which are
 // byte blobs and can embed envelopes. Hence this byteswapping macro.
-#if IS_BIG_ENDIAN
-#define BSWAP16(x) (x)
-#else
-#define BSWAP16(x) (((x) & 0xff) << 8 | (((x) >> 8) & 0xff))
-#endif
+// BSWAP16() definition has been moved to macros.h. Use BE_TO_HOST16() for the
+// same effect in the future.
 
 void sequence_player_process_sound(struct SequencePlayer *seqPlayer);
 void note_vibrato_update(struct Note *note);
