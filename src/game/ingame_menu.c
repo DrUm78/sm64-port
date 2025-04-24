@@ -318,7 +318,7 @@ static inline u8 *convert_ia4_char(u8 c, u8 *tex, s16 w, s16 h) {
 
 void render_generic_char_at_pos(s16 xPos, s16 yPos, u8 c) {
     FLIP_TO_FULLSCREEN
-    
+
     void **fontLUT;
     void *packedTexture;
     void *unpackedTexture;
@@ -2509,7 +2509,7 @@ void print_hud_pause_colorful_str(void) {
     print_hud_lut_string(HUD_LUT_GLOBAL, get_str_x_pos_from_center_scale(
                          SCREEN_WIDTH / 2, textPause, 12.0f), 81, textPause);
 #elif VERSION_JP
-    print_hud_lut_string(HUD_LUT_GLOBAL, 123, 81, textPause);
+    print_hud_lut_string(HUD_LUT_GLOBAL, 126, 81, textPause);
 #else
     print_hud_lut_string(HUD_LUT_GLOBAL, 130, 81, textPause);
 #endif
@@ -2863,7 +2863,7 @@ void play_star_fanfare_and_flash_hud(s32 arg, u8 starNum) {
 
 void render_course_complete_lvl_info_and_hud_str(void) {
     FLIP_TO_FULLSCREEN
-    
+
 #if defined(VERSION_JP) || defined(VERSION_SH)
     u8 textSymStar[] = { GLYPH_STAR, GLYPH_SPACE };
     u8 textCourse[] = { TEXT_COURSE };
