@@ -2722,7 +2722,7 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
 #elif VERSION_JP
         print_menu_generic_string(HISCORE_X - 10, 24, textHiScore);
 #else
-        print_menu_generic_string(HISCORE_X + 3, 24, textHiScore);
+        print_menu_generic_string(HISCORE_X + 4, 24, textHiScore);
 #endif
     }
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);
