@@ -626,7 +626,7 @@ void render_score_menu_buttons(struct Object *scoreButton) {
     sMainMenuButtons[MENU_BUTTON_SCORE_FILE_D]->oMenuButtonScale = 0.11111111f;
     // Return to main menu button
     sMainMenuButtons[MENU_BUTTON_SCORE_RETURN] = spawn_object_rel_with_rot(
-        scoreButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 625, -388, -100, 0, -0x8000, 0);
+        scoreButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_SCORE_RETURN]->oMenuButtonScale = 0.11111111f;
     // Switch to copy menu button
     sMainMenuButtons[MENU_BUTTON_SCORE_COPY_FILE] = spawn_object_rel_with_rot(
@@ -634,7 +634,7 @@ void render_score_menu_buttons(struct Object *scoreButton) {
     sMainMenuButtons[MENU_BUTTON_SCORE_COPY_FILE]->oMenuButtonScale = 0.11111111f;
     // Switch to erase menu button
     sMainMenuButtons[MENU_BUTTON_SCORE_ERASE_FILE] = spawn_object_rel_with_rot(
-        scoreButton, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, -625, -388, -100, 0, -0x8000, 0);
+        scoreButton, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, -711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_SCORE_ERASE_FILE]->oMenuButtonScale = 0.11111111f;
 }
 
@@ -736,7 +736,7 @@ void render_copy_menu_buttons(struct Object *copyButton) {
     sMainMenuButtons[MENU_BUTTON_COPY_FILE_D]->oMenuButtonScale = 0.11111111f;
     // Return to main menu button
     sMainMenuButtons[MENU_BUTTON_COPY_RETURN] = spawn_object_rel_with_rot(
-        copyButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 625, -388, -100, 0, -0x8000, 0);
+        copyButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_COPY_RETURN]->oMenuButtonScale = 0.11111111f;
     // Switch to score menu button
     sMainMenuButtons[MENU_BUTTON_COPY_CHECK_SCORE] = spawn_object_rel_with_rot(
@@ -744,7 +744,7 @@ void render_copy_menu_buttons(struct Object *copyButton) {
     sMainMenuButtons[MENU_BUTTON_COPY_CHECK_SCORE]->oMenuButtonScale = 0.11111111f;
     // Switch to erase menu button
     sMainMenuButtons[MENU_BUTTON_COPY_ERASE_FILE] = spawn_object_rel_with_rot(
-        copyButton, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, -625, -388, -100, 0, -0x8000, 0);
+        copyButton, MODEL_MAIN_MENU_RED_ERASE_BUTTON, bhvMenuButton, -711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_COPY_ERASE_FILE]->oMenuButtonScale = 0.11111111f;
 }
 
@@ -912,7 +912,7 @@ void render_erase_menu_buttons(struct Object *eraseButton) {
     sMainMenuButtons[MENU_BUTTON_ERASE_FILE_D]->oMenuButtonScale = 0.11111111f;
     // Return to main menu button
     sMainMenuButtons[MENU_BUTTON_ERASE_RETURN] = spawn_object_rel_with_rot(
-        eraseButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 625, -388, -100, 0, -0x8000, 0);
+        eraseButton, MODEL_MAIN_MENU_YELLOW_FILE_BUTTON, bhvMenuButton, 711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_ERASE_RETURN]->oMenuButtonScale = 0.11111111f;
     // Switch to score menu button
     sMainMenuButtons[MENU_BUTTON_ERASE_CHECK_SCORE] = spawn_object_rel_with_rot(
@@ -920,7 +920,7 @@ void render_erase_menu_buttons(struct Object *eraseButton) {
     sMainMenuButtons[MENU_BUTTON_ERASE_CHECK_SCORE]->oMenuButtonScale = 0.11111111f;
     // Switch to copy menu button
     sMainMenuButtons[MENU_BUTTON_ERASE_COPY_FILE] = spawn_object_rel_with_rot(
-        eraseButton, MODEL_MAIN_MENU_BLUE_COPY_BUTTON, bhvMenuButton, -625, -388, -100, 0, -0x8000, 0);
+        eraseButton, MODEL_MAIN_MENU_BLUE_COPY_BUTTON, bhvMenuButton, -711, -388, -100, 0, -0x8000, 0);
     sMainMenuButtons[MENU_BUTTON_ERASE_COPY_FILE]->oMenuButtonScale = 0.11111111f;
 }
 
@@ -1873,17 +1873,17 @@ void score_menu_display_message(s8 messageID) {
 }
 
 #if defined(VERSION_JP) || defined(VERSION_SH)
-    #define RETURN_X     58
-    #define COPYFILE_X1  127
-    #define ERASEFILE_X1 216
+    #define RETURN_X     45
+    #define COPYFILE_X1  128
+    #define ERASEFILE_X1 228
 #elif VERSION_EU
     #define RETURN_X     centeredX
     #define COPYFILE_X1  centeredX
     #define ERASEFILE_X1 centeredX
 #else
-    #define RETURN_X     56
+    #define RETURN_X     44
     #define COPYFILE_X1  135
-    #define ERASEFILE_X1 218
+    #define ERASEFILE_X1 231
 #endif
 
 #ifdef VERSION_EU
@@ -2076,14 +2076,14 @@ void copy_menu_update_message(void) {
 }
 
 #if defined(VERSION_JP) || defined(VERSION_SH)
-    #define VIEWSCORE_X1 132
-    #define ERASEFILE_X2 216
+    #define VIEWSCORE_X1 133
+    #define ERASEFILE_X2 220
 #elif VERSION_EU
     #define VIEWSCORE_X1 centeredX
     #define ERASEFILE_X2 centeredX
 #else
     #define VIEWSCORE_X1 128
-    #define ERASEFILE_X2 218
+    #define ERASEFILE_X2 230
 #endif
 
 /**
@@ -2220,7 +2220,7 @@ void print_erase_menu_prompt(s16 x, s16 y) {
 // M a r i o   A --- マ リ オ Ａ
 // 0 1 2 3 4 5 6 --- 0 1 2 3
 #if defined(VERSION_JP) || defined(VERSION_SH)
-    #define ERASE_FILE_X     110
+    #define ERASE_FILE_X     96
     #define NOSAVE_DATA_X3   90
     #define MARIO_ERASED_VAR 3
     #define MARIO_ERASED_X   90
@@ -2331,11 +2331,11 @@ void erase_menu_update_message(void) {
 }
 
 #if defined(VERSION_JP) || defined(VERSION_SH)
-#define VIEWSCORE_X2 132
-#define COPYFILE_X2 213
+#define VIEWSCORE_X2 133
+#define COPYFILE_X2 223
 #else
 #define VIEWSCORE_X2 127
-#define COPYFILE_X2 221
+#define COPYFILE_X2 233
 #endif
 
 /**
@@ -2534,17 +2534,10 @@ void print_score_file_course_coin_score(s8 fileIndex, s16 courseIndex, s16 x, s1
     // MYSCORE
     if (sScoreFileCoinScoreMode == 0) {
         // Print "[coin] x"
-#ifdef VERSION_JP
-        print_menu_generic_string(x + 15, y, textCoinX);
+        print_menu_generic_string(x + 25, y, textCoinX);
         // Print coin score
         int_to_str(save_file_get_course_coin_score(fileIndex, courseIndex), coinScoreText);
-        print_menu_generic_string(x + 31, y, coinScoreText);
-#else
-        print_menu_generic_string(x + 24, y, textCoinX);
-        // Print coin score
-        int_to_str(save_file_get_course_coin_score(fileIndex, courseIndex), coinScoreText);
-        print_menu_generic_string(x + 40, y, coinScoreText);
-#endif
+        print_menu_generic_string(x + 41, y, coinScoreText);
         // If collected, print 100 coin star
         if (stars & (1 << 6)) {
             print_menu_generic_string(x + 70, y, textStar);
@@ -2553,20 +2546,13 @@ void print_score_file_course_coin_score(s8 fileIndex, s16 courseIndex, s16 x, s1
     // HISCORE
     else {
         // Print "[coin] x"
-        //print_menu_generic_string(x + HISCORE_COIN_ICON_X, y, textCoinX);
+        print_menu_generic_string(x + HISCORE_COIN_ICON_X, y, textCoinX);
         // Print coin highscore
         int_to_str((u16) save_file_get_max_coin_score(courseIndex) & 0xFFFF, coinScoreText);
-#ifdef VERSION_JP
-        print_menu_generic_string(x + HISCORE_COIN_TEXT_X - 14, y, coinScoreText);
+        print_menu_generic_string(x + HISCORE_COIN_TEXT_X, y, coinScoreText);
         // Print coin highscore file
-        print_menu_generic_string(x + HISCORE_COIN_NAMES_X - 14, y,
+        print_menu_generic_string(x + HISCORE_COIN_NAMES_X, y,
                          fileNames[(save_file_get_max_coin_score(courseIndex) >> 16) & 0xFFFF]);
-#else
-        print_menu_generic_string(x + HISCORE_COIN_TEXT_X - 15, y, coinScoreText);
-        // Print coin highscore file
-        print_menu_generic_string(x + HISCORE_COIN_NAMES_X - 15, y,
-                         fileNames[(save_file_get_max_coin_score(courseIndex) >> 16) & 0xFFFF]);
-#endif
     }
 }
 
@@ -2594,15 +2580,15 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
 #if defined(VERSION_JP) || defined(VERSION_SH)
     #define MARIO_X 28
     #define FILE_LETTER_X 86
-    #define LEVEL_NAME_X 29
-    #define SECRET_STARS_X 162
+    #define LEVEL_NAME_X 23
+    #define SECRET_STARS_X 152
     #define MYSCORE_X 237
     #define HISCORE_X 237
 #else
     #define MARIO_X 25
     #define FILE_LETTER_X 95
     #define LEVEL_NAME_X 29
-    #define SECRET_STARS_X 173
+    #define SECRET_STARS_X 171
     #define MYSCORE_X 238
     #define HISCORE_X 231
 #endif
@@ -2651,11 +2637,11 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
     // Print file name at top
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_begin);
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
-    print_hud_lut_string(HUD_LUT_DIFF, MARIO_X + 16, 15, textMario);
-    print_hud_lut_string(HUD_LUT_GLOBAL, FILE_LETTER_X + 16, 15, textFileLetter);
+    print_hud_lut_string(HUD_LUT_DIFF, MARIO_X, 15, textMario);
+    print_hud_lut_string(HUD_LUT_GLOBAL, FILE_LETTER_X, 15, textFileLetter);
 
     // Print save file star count at top
-    print_save_file_star_count(fileIndex, 140, 15);
+    print_save_file_star_count(fileIndex, 124, 15);
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
     // Print course scores
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_begin);
@@ -2665,16 +2651,16 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
 //  PADCHAR is used to difference an x position value between
 //  JP and US when the course number is only one digit.
 #if defined(VERSION_JP) || defined(VERSION_SH)
-    #define PADCHAR 5
+    #define PADCHAR 0
     #define PRINT_COURSE_SCORES(courseIndex, pad)                                                               \
         print_menu_generic_string(23 + (pad * 3), 23 + 12 * courseIndex, segmented_to_virtual(levelNameTable[courseIndex - 1]));  \
-        print_score_file_star_score(fileIndex, courseIndex - 1, 162, 23 + 12 * courseIndex);                        \
+        print_score_file_star_score(fileIndex, courseIndex - 1, 152, 23 + 12 * courseIndex);                        \
         print_score_file_course_coin_score(fileIndex, courseIndex - 1, 213, 23 + 12 * courseIndex);
 #else
-    #define PADCHAR 7
+    #define PADCHAR 1
     #define PRINT_COURSE_SCORES(courseIndex, pad)                                                               \
         print_menu_generic_string(23 + (pad * 3), 23 + 12 * courseIndex, segmented_to_virtual(levelNameTable[courseIndex - 1]));  \
-        print_score_file_star_score(fileIndex, courseIndex - 1, 173, 23 + 12 * courseIndex);                        \
+        print_score_file_star_score(fileIndex, courseIndex - 1, 171, 23 + 12 * courseIndex);                        \
         print_score_file_course_coin_score(fileIndex, courseIndex - 1, 213, 23 + 12 * courseIndex);
 #endif
     // Course values are indexed, from Bob-omb Battlefield to Rainbow Ride
@@ -2687,21 +2673,17 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
     PRINT_COURSE_SCORES(COURSE_LLL, PADCHAR) // LLL
     PRINT_COURSE_SCORES(COURSE_SSL, PADCHAR) // SSL
     PRINT_COURSE_SCORES(COURSE_DDD, PADCHAR) // DDD
-    PRINT_COURSE_SCORES(COURSE_SL, 6)  // SL
-    PRINT_COURSE_SCORES(COURSE_WDW, 6) // WDW
-    PRINT_COURSE_SCORES(COURSE_TTM, 6) // TTM
-    PRINT_COURSE_SCORES(COURSE_THI, 6) // THI
-    PRINT_COURSE_SCORES(COURSE_TTC, 6) // TTC
-    PRINT_COURSE_SCORES(COURSE_RR, 6) // RR
+    PRINT_COURSE_SCORES(COURSE_SL, 0)  // SL
+    PRINT_COURSE_SCORES(COURSE_WDW, 0) // WDW
+    PRINT_COURSE_SCORES(COURSE_TTM, 0) // TTM
+    PRINT_COURSE_SCORES(COURSE_THI, 0) // THI
+    PRINT_COURSE_SCORES(COURSE_TTC, 0) // TTC
+    PRINT_COURSE_SCORES(COURSE_RR, 0) // RR
 #undef PRINT_COURSE_SCORES
 #undef PADCHAR
 
     // Print level name
-#ifdef VERSION_JP
-    print_menu_generic_string(LEVEL_NAME_X + 12, 215, segmented_to_virtual(levelNameTable[25]));
-#else
-    print_menu_generic_string(LEVEL_NAME_X + 18, 215, segmented_to_virtual(levelNameTable[25]));
-#endif
+    print_menu_generic_string(LEVEL_NAME_X, 215, segmented_to_virtual(levelNameTable[25]));
     // Print castle secret stars
     print_score_file_castle_secret_stars(fileIndex, SECRET_STARS_X, 215);
 
@@ -2710,19 +2692,15 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
 #ifdef VERSION_EU
         print_menu_generic_string(get_str_x_pos_from_center(257, textMyScore[sLanguageMode], 10.0f),
             24, textMyScore[sLanguageMode]);
-#elif VERSION_JP
-        print_menu_generic_string(MYSCORE_X - 10, 24, textMyScore);
 #else
-        print_menu_generic_string(MYSCORE_X - 6, 24, textMyScore);
+        print_menu_generic_string(MYSCORE_X, 24, textMyScore);
 #endif
     } else {
 #ifdef VERSION_EU
         print_menu_generic_string(get_str_x_pos_from_center(257, textHiScore[sLanguageMode], 10.0f),
             24,textHiScore[sLanguageMode]);
-#elif VERSION_JP
-        print_menu_generic_string(HISCORE_X - 10, 24, textHiScore);
 #else
-        print_menu_generic_string(HISCORE_X + 4, 24, textHiScore);
+        print_menu_generic_string(HISCORE_X, 24, textHiScore);
 #endif
     }
     gSPDisplayList(gDisplayListHead++, dl_menu_ia8_text_end);

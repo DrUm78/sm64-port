@@ -27,7 +27,7 @@ typedef enum{
 // typedef enum {ASPECT_RATIOS} ENUM_ASPECT_RATIOS_TYPES;
 
 ////------ Defines to be shared -------
-#define RES_HW_SCREEN_HORIZONTAL    240
+#define RES_HW_SCREEN_HORIZONTAL    320
 #define RES_HW_SCREEN_VERTICAL      240
 #define STEP_CHANGE_VOLUME          10
 #define STEP_CHANGE_BRIGHTNESS      10

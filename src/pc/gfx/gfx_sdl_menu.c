@@ -37,7 +37,7 @@
 #define SCREEN_VERTICAL_SIZE        RES_HW_SCREEN_VERTICAL
 
 #define SCROLL_SPEED_PX             30
-#define FPS_MENU                    50
+#define FPS_MENU                    60
 #define ARROWS_PADDING              8
 
 #define MENU_ZONE_WIDTH             SCREEN_HORIZONTAL_SIZE
@@ -45,6 +45,17 @@
 #define MENU_BG_SQUARE_WIDTH        180
 #define MENU_BG_SQUARE_HEIGHT       140
 
+#if defined(GCW0)
+#define MENU_FONT_NAME_TITLE        "menu_resources/OpenSans-Bold.ttf"
+#define MENU_FONT_SIZE_TITLE        22
+#define MENU_FONT_NAME_INFO         "menu_resources/OpenSans-Bold.ttf"
+#define MENU_FONT_SIZE_INFO         16
+#define MENU_FONT_NAME_SMALL_INFO   "menu_resources/OpenSans-Regular.ttf"
+#define MENU_FONT_SIZE_SMALL_INFO   13
+#define MENU_PNG_BG_PATH            "menu_resources/zone_bg.png"
+#define MENU_PNG_ARROW_TOP_PATH     "menu_resources/arrow_top.png"
+#define MENU_PNG_ARROW_BOTTOM_PATH  "menu_resources/arrow_bottom.png"
+#else
 #define MENU_FONT_NAME_TITLE        "/usr/games/menu_resources/OpenSans-Bold.ttf"
 #define MENU_FONT_SIZE_TITLE        22
 #define MENU_FONT_NAME_INFO         "/usr/games/menu_resources/OpenSans-Bold.ttf"
@@ -54,6 +65,7 @@
 #define MENU_PNG_BG_PATH            "/usr/games/menu_resources/zone_bg.png"
 #define MENU_PNG_ARROW_TOP_PATH     "/usr/games/menu_resources/arrow_top.png"
 #define MENU_PNG_ARROW_BOTTOM_PATH  "/usr/games/menu_resources/arrow_bottom.png"
+#endif
 
 #define GRAY_MAIN_R                 85
 #define GRAY_MAIN_G                 85
@@ -339,30 +351,30 @@ void add_menu_zone(ENUM_MENU_TYPE menu_type){
 
 void init_menu_zones(){
     /// Init Volume Menu
-    add_menu_zone(MENU_TYPE_VOLUME);
-    
+    //add_menu_zone(MENU_TYPE_VOLUME);
+
     /// Init Brightness Menu
-    add_menu_zone(MENU_TYPE_BRIGHTNESS);
-    
+    //add_menu_zone(MENU_TYPE_BRIGHTNESS);
+
     /// Init Save Menu
     add_menu_zone(MENU_TYPE_SAVE);
-    
+
     /// Init Load Menu
     add_menu_zone(MENU_TYPE_LOAD);
-    
+
     /// Init Aspect Ratio Menu
     //add_menu_zone(MENU_TYPE_ASPECT_RATIO);
-    
+
     /// Init Exit Menu
     add_menu_zone(MENU_TYPE_EXIT);
-    
+
     /// Init Powerdown Menu
     //add_menu_zone(MENU_TYPE_POWERDOWN);
 }
 
 
 void init_menu_system_values(){
-    FILE *fp;
+    /*FILE *fp;
     char res[100];
     
     /// ------- Get system volume percentage --------
@@ -405,7 +417,7 @@ void init_menu_system_values(){
             brightness_percentage = atoi(res);
             MENU_DEBUG_PRINTF("System brightness = %d%%\n", brightness_percentage);
         }
-    }
+    }*/
 
     /// ------ Save prev key repeat params and set new Key repeat -------
     SDL_GetKeyRepeat(&backup_key_repeat_delay, &backup_key_repeat_interval);
@@ -622,7 +634,7 @@ void run_menu_loop()
     char fname[MAXPATHLEN];
 
     /// ------ Load default keymap ------
-    system(SHELL_CMD_KEYMAP_DEFAULT);
+    //system(SHELL_CMD_KEYMAP_DEFAULT);
 
     /// ------ Get init values -------
     init_menu_system_values();
@@ -636,7 +648,7 @@ void run_menu_loop()
 			RES_HW_SCREEN_HORIZONTAL * RES_HW_SCREEN_VERTICAL * sizeof(uint32_t));
 
     /* Stop Ampli */
-    system(SHELL_CMD_AUDIO_AMP_OFF);
+    //system(SHELL_CMD_AUDIO_AMP_OFF);
  
     /// -------- Main loop ---------
     while (!stop_menu_loop)
@@ -654,6 +666,7 @@ void run_menu_loop()
                 switch (event.key.keysym.sym)
                 {
                     case SDLK_b:
+                    case SDLK_LALT:
                         if(menu_confirmation){
                             /// ------ Reset menu confirmation ------
                             menu_confirmation = 0;
@@ -667,6 +680,7 @@ void run_menu_loop()
 
                     case SDLK_q:
                     case SDLK_ESCAPE:
+                    case SDLK_HOME:
                         stop_menu_loop = 1;
                         break;
 
@@ -831,6 +845,7 @@ void run_menu_loop()
 
                     case SDLK_a:
                     case SDLK_RETURN:
+                    case SDLK_LCTRL:
                     if(idx_menus[menuItem] == MENU_TYPE_SAVE){
                             if(menu_confirmation){
                                 MENU_DEBUG_PRINTF("Saving in slot %d\n", menu_saveslot);
@@ -965,7 +980,7 @@ void run_menu_loop()
     }
 
     /// ------ Restore last keymap ------
-    system(SHELL_CMD_KEYMAP_RESUME);
+    //system(SHELL_CMD_KEYMAP_RESUME);
 
     /// ------ Reset prev key repeat params -------
     if(SDL_EnableKeyRepeat(backup_key_repeat_delay, backup_key_repeat_interval)){
@@ -973,5 +988,5 @@ void run_menu_loop()
     }
 
     /* Start Ampli */
-    system(SHELL_CMD_AUDIO_AMP_ON);
+    //system(SHELL_CMD_AUDIO_AMP_ON);
 }

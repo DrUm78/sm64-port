@@ -41,9 +41,9 @@ NOWUP = NOWUP
 
 DEBUG = 0
 
-TARGET_FUNKEY ?= 1
+TARGET_FUNKEY ?= 0
 TARGET_RS97 ?= 0
-TARGET_OD ?= 0
+TARGET_OD ?= 1
 
 # Pick GL backend for DOS: osmesa, dmesa
 DOS_GL := osmesa
@@ -243,7 +243,11 @@ else
     ifeq ($(TARGET_FUNKEY),1)
       BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_funkey
     else
-      BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
+      ifeq ($(TARGET_OD),1)
+        BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_gcw0
+      else
+        BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
+      endif
     endif
   endif
 endif
@@ -517,7 +521,6 @@ ifeq ($(TARGET_WINDOWS),1)
   PLATFORM_LDFLAGS := -lm -lxinput9_1_0 -lole32 -no-pie -mwindows
 endif
 ifeq ($(TARGET_LINUX),1)
-
 ifeq ($(TARGET_FUNKEY),1)
   OD_TOOLCHAIN ?= /opt/FunKey-sdk/
   CC := $(OD_TOOLCHAIN)bin/arm-funkey-linux-musleabihf-gcc
@@ -525,7 +528,6 @@ ifeq ($(TARGET_FUNKEY),1)
   LD := $(OD_TOOLCHAIN)bin/arm-funkey-linux-musleabihf-gcc
   MARCH :=  -march=armv7-a+neon-vfpv4 -mtune=cortex-a7 -mfpu=neon-vfpv4 -Ofast -fno-PIC -fdata-sections -ffunction-sections -fsingle-precision-constant -fno-common -fno-builtin -DFUNKEY
 endif
-
 ifeq ($(TARGET_RS97),1)
   OD_TOOLCHAIN ?= /opt/rs97-toolchain/
   CC := $(OD_TOOLCHAIN)bin/mipsel-linux-gcc
@@ -548,11 +550,11 @@ ifeq ($(TARGET_BITTBOY),1)
   MARCH := -march=armv5te -mtune=arm926ej-s -O2 -fno-PIC -fdata-sections -ffunction-sections -fsingle-precision-constant -fno-common -flto -fno-builtin
 endif
 ifeq ($(TARGET_OD),1)
-  OD_TOOLCHAIN ?= /opt/gcw0-toolchain/
+  OD_TOOLCHAIN ?= /opt/gcw0-toolchain-gcc12.3.0/
   CC := $(OD_TOOLCHAIN)bin/mipsel-linux-gcc
   CXX := $(OD_TOOLCHAIN)bin/mipsel-linux-g++
   LD := $(OD_TOOLCHAIN)bin/mipsel-linux-gcc
-  MARCH := -march=mips32r2 -mtune=mips32r2 -Ofast -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mplt -mno-shared -fno-PIC -flto -fno-builtin -mno-memcpy -fsection-anchors -fdelete-dead-exceptions
+  MARCH := -march=mips32r2 -mtune=mips32r2 -Ofast -fno-fast-math -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mplt -mno-shared -fno-PIC -flto -fno-builtin -mno-memcpy -fsection-anchors -fdelete-dead-exceptions -DGCW0
 endif
   PLATFORM_CFLAGS  := -DTARGET_LINUX
   PLATFORM_LDFLAGS := -lm -lpthread -no-pie -flto
@@ -589,7 +591,6 @@ ifeq ($(ENABLE_OPENGL_LEGACY),1)
   GFX_CFLAGS  := -DENABLE_OPENGL_LEGACY
   GFX_LDFLAGS :=
 endif
-
 ifneq ($(ENABLE_OPENGL)$(ENABLE_OPENGL_LEGACY),00)
   ifeq ($(TARGET_WINDOWS),1)
     GFX_CFLAGS  += $(shell sdl-config --cflags) -DGLEW_STATIC
@@ -635,8 +636,9 @@ else ifeq ($(ENABLE_SOFTRAST),1)
 	  GFX_CFLAGS  += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell /opt/bittboy-toolchain/arm-buildroot-linux-musleabi/sysroot/usr/bin/sdl-config --libs)  -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s
 	else ifeq ($(TARGET_OD),1)
-	  GFX_CFLAGS  += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --cflags)
-	  GFX_LDFLAGS += $(shell /opt/gcw0-toolchain/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s -no-pie
+	  GFX_CFLAGS  += $(shell /opt/gcw0-toolchain-gcc12.3.0/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --cflags)
+	  GFX_LDFLAGS += $(shell /opt/gcw0-toolchain-gcc12.3.0/mipsel-gcw0-linux-uclibc/sysroot/usr/bin/sdl-config --libs) -flto -Wl,--as-needed -Wl,--gc-sections -Wl,-O1,--sort-common -s -no-pie
+    GFX_LDFLAGS += -lSDL_ttf -lSDL_image
 	else
 	  GFX_CFLAGS  += $(shell sdl-config --cflags)
 	  GFX_LDFLAGS += $(shell sdl-config --libs)

@@ -2045,7 +2045,7 @@ void do_cutscene_handler(void) {
 #define STR_X 53
 #define STR_Y 136
 #else
-#define STR_X 48
+#define STR_X 38
 #define STR_Y 142
 #endif
 
@@ -2212,7 +2212,7 @@ void render_pause_red_coins(void) {
     s8 x;
 
     for (x = 0; x < gRedCoinsCollected; x++) {
-        print_animated_red_coin(GFX_DIMENSIONS_FROM_RIGHT_EDGE(50) - x * 20, 16);
+        print_animated_red_coin(GFX_DIMENSIONS_FROM_RIGHT_EDGE(30) - x * 20, 16);
     }
 }
 
@@ -2227,7 +2227,7 @@ u8 gTextCourseArr[][7] = {
 #if defined(VERSION_JP) || defined(VERSION_SH)
 #define CRS_NUM_X1 93
 #else
-#define CRS_NUM_X1 99
+#define CRS_NUM_X1 100
 #endif
 #ifdef VERSION_EU
 #define TXT_STAR_X 89
@@ -2235,9 +2235,9 @@ u8 gTextCourseArr[][7] = {
 #define LVL_NAME_X 108
 #define MYSCORE_X  48
 #else
-#define TXT_STAR_X 62
-#define ACT_NAME_X 81
-#define LVL_NAME_X 116
+#define TXT_STAR_X 98
+#define ACT_NAME_X 116
+#define LVL_NAME_X 117
 #define MYSCORE_X  62
 #endif
 
@@ -2314,7 +2314,7 @@ void render_pause_my_score_coins(void) {
 #ifdef VERSION_EU
         print_generic_string(48, 157, gTextCourseArr[gInGameLanguage]);
 #else
-        print_generic_string(62, 157, textCourse);
+        print_generic_string(63, 157, textCourse);
 #endif
         int_to_str(gCurrCourseNum, strCourseNum);
 #ifdef VERSION_EU
@@ -2508,10 +2508,8 @@ void print_hud_pause_colorful_str(void) {
 #ifdef VERSION_EU
     print_hud_lut_string(HUD_LUT_GLOBAL, get_str_x_pos_from_center_scale(
                          SCREEN_WIDTH / 2, textPause, 12.0f), 81, textPause);
-#elif VERSION_JP
-    print_hud_lut_string(HUD_LUT_GLOBAL, 126, 81, textPause);
 #else
-    print_hud_lut_string(HUD_LUT_GLOBAL, 130, 81, textPause);
+    print_hud_lut_string(HUD_LUT_GLOBAL, 123, 81, textPause);
 #endif
 
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
@@ -2714,8 +2712,8 @@ s16 render_pause_courses_and_castle(void) {
         case DIALOG_STATE_HORIZONTAL:
             shade_screen();
             print_hud_pause_colorful_str();
-            render_pause_castle_menu_box(161, 143);
-            render_pause_castle_main_strings(105, 60);
+            render_pause_castle_menu_box(160, 143);
+            render_pause_castle_main_strings(104, 60);
 
 #ifdef VERSION_EU
             if (gPlayer3Controller->buttonPressed & (A_BUTTON | Z_TRIG | START_BUTTON))

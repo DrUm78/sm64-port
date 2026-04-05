@@ -10,8 +10,8 @@ This is a novelty port of the sm64-port to DOS. Do not expect it to be playable.
 
 ## Building Instructions
 
-### FunKey S
-Simply go to [this webpage](https://colab.research.google.com/drive/1uxUvWPBeIl9XkrRpXphE0kABLMEharGy) and follow the instructions.
+### GKD 350H / GKD Pixel
+Simply go to [this webpage](https://colab.research.google.com/drive/1vDSdWCYThEHM_N2jq3LL0RqzaDZQFU94) and follow the instructions.
 
 ### Docker
 

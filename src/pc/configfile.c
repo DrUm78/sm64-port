@@ -40,14 +40,14 @@ bool configEnableFog             = false;
 unsigned int configScreenWidth   = 80;
 unsigned int configScreenHeight  = 60;
 unsigned int configFrameskip     = 30;
-#elif defined(FUNKEY)
+#elif defined(FUNKEY) || defined(GCW0)
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
 unsigned int configFrameskip     = 2;
 #else
 unsigned int configScreenWidth   = 320;
 unsigned int configScreenHeight  = 240;
-unsigned int configFrameskip     = 30;
+unsigned int configFrameskip     = 2;
 #endif
 // Keyboard mappings (scancode values)
 #ifdef TARGET_DOS
