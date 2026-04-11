@@ -64,7 +64,6 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-
 #if defined(VERSION_EU)
 # define FRAMERATE 25
 #else
@@ -127,7 +126,6 @@ static double f_time SAVESTATE_EXCLUDE = 0.0;
 // #if defined(DIRECT_SDL) && defined(SDL_SURFACE)
 // 	uint32_t *gfx_output SAVESTATE_EXCLUDE;
 // #endif
-
 
 const SDLKey windows_scancode_table[] =
 {
@@ -196,7 +194,7 @@ static void apply_subRes(int res) {
 static void set_higherRes(bool dichotomic, bool call_callback) {
 #ifdef ENABLE_SOFTRAST
   //printf("%s\n", __func__);
-  
+
   /** Linear */
   if(!dichotomic){
     current_res_idx = (current_res_idx>0)?(current_res_idx-1):0;
@@ -204,7 +202,7 @@ static void set_higherRes(bool dichotomic, bool call_callback) {
   else{   /** Dichotomic */
     current_res_idx = current_res_idx/2;
   }  
-  
+
   apply_subRes(current_res_idx);
   DEBUG_ADAPTATIVE_RES_PRINTF("Set higher resolution %s (idx %d/%d): %dx%d\n", 
     dichotomic?"dichotomic":"linear", current_res_idx, (NB_SUBRESOLUTIONS-1), window_width, window_height);
@@ -312,7 +310,6 @@ int test_vsync(void) {
     vsync_enabled = 0;
 }
 
-
 static uint32_t timer_handler(uint32_t interval, void *param)
 {
     //printf("%s, interval=%d, tick=%d\n", __func__, interval, tick);
@@ -321,9 +318,9 @@ static uint32_t timer_handler(uint32_t interval, void *param)
 }
 
 static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
-    
+
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
-    
+
     if(TTF_Init()==-1) {
       printf("ERROR TTF_Init: %s\n", TTF_GetError());
       game_exit();
@@ -334,7 +331,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
 
     char title[512];
     sprintf(title, "%s (%s)", game_name, GFX_API_NAME);
-	
+
     window_width = configScreenWidth;
     window_height = configScreenHeight;
 #ifdef ENABLE_SOFTRAST
@@ -348,7 +345,6 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     #else
     	texture = SDL_SetVideoMode(240, 240, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
 
-
       int dividend = (1 << (SUB_RES_DIVIDER-1)); 
       for(int i=0; i < NB_SUBRESOLUTIONS; i++){
         int factor = dividend-i;
@@ -358,7 +354,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
         sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 32, 0,0,0,0);  
         DEBUG_ADAPTATIVE_RES_PRINTF("Creating surface for sub resolution[%d]: %dx%d \n", i, resolutions[i].w, resolutions[i].h);
       }
-      
+
       //set_halfResScreen(!start_in_fullscreen, false);
       current_res_idx = 0;
       sdl_screen = sdl_screen_subRes[current_res_idx];
@@ -431,7 +427,7 @@ static void gfx_sdl_main_loop(void (*run_one_game_iter)(void)) {
         int skip = (frames > configFrameskip) ? configFrameskip : (frames - 1);
         for (uint32_t f = 0; f < frames; ++f, --skip) {
             do_render = (skip <= 0);
-            
+
             /*if(!do_render){
               printf("frameskip! %d missed frames\n", frames-1);
             }*/
@@ -443,7 +439,7 @@ static void gfx_sdl_main_loop(void (*run_one_game_iter)(void)) {
         do_render = true;
         run_one_game_iter();
     }
-    
+
     last = now;
 
     /*while (1) {
@@ -494,7 +490,7 @@ static void gfx_sdl_handle_events(void) {
             // Scancodes are broken in Emscripten SDL2: https://bugzilla.libsdl.org/show_bug.cgi?id=3259
             case SDL_KEYDOWN:
                 switch(event.key.keysym.sym){
-                  
+
                   case SDLK_q:
                   //game_exit();
                   run_menu_loop();
@@ -565,7 +561,7 @@ static void sync_framerate_with_timer(void) {
       SDL_Delay(frame_time - elapsed);
     }
     last_time = SDL_GetTicks();
-    
+
     elapsed_time_avg += elapsed;
     elapsed_time_cnt++;
 
@@ -598,15 +594,12 @@ static void sync_framerate_with_timer(void) {
       elapsed_time_cnt = 0;
       elapsed_time_avg = 0;
     }
-      
 }
-
 
 static uint16_t rgb888Torgb565(uint32_t s)
 {
 	return (uint16_t) ((s >> 8 & 0xf800) + (s >> 5 & 0x7e0) + (s >> 3 & 0x1f));
 }
-
 
 /// Nearest neighboor optimized with possible out of screen coordinates (for cropping)
 static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Rect *src_rect, SDL_Surface *dst_surface, int new_w, int new_h) {
@@ -649,480 +642,12 @@ static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Rect
   }
 }
 
-
-
-/// Nearest neighboor optimized with possible out of screen coordinates (for cropping)
-void flip_Upscaling_Bilinear(SDL_Surface *src_surface, SDL_Rect *src_rect, SDL_Surface *dst_surface, int new_w, int new_h){
-  int w1 = src_rect->w;
-  int h1 = src_rect->h;
-  int w2=new_w;
-  int h2=new_h;
-  int x_ratio = (int) ((w1 << 16) / w2);
-  int y_ratio = (int) ((h1 << 16) / h2);
-  uint32_t x_diff, y_diff;
-  uint32_t red_comp, green_comp, blue_comp, alpha_comp;
-  uint32_t p_val_tl, p_val_tr, p_val_bl, p_val_br;
-  int x, y ;
-  //printf("src_surface->h=%d, h2=%d\n", src_surface->h, h2);
-
-  /// --- Compute padding for centering when out of bounds ---
-  int y_padding = (RES_HW_SCREEN_VERTICAL-new_h)/2;
-  int x_padding = 0;
-  if(w2>RES_HW_SCREEN_HORIZONTAL){
-    x_padding = (w2-RES_HW_SCREEN_HORIZONTAL)/2 + 1;
-  }
-  int x_padding_ratio = x_padding * w1 / w2;
-
-  /// --- Offset to get first src_pixels row
-  uint32_t *src_row = (uint32_t*)(src_surface->pixels) + src_surface->w * src_rect->y + src_rect->x;
-
-  for (int i=0;i<h2;i++)
-  {
-    if(i>=RES_HW_SCREEN_VERTICAL){
-      continue;
-    }
-
-    uint32_t *t = ((uint32_t *)dst_surface->pixels) + ((i + y_padding) * ((w2 > RES_HW_SCREEN_HORIZONTAL) ? RES_HW_SCREEN_HORIZONTAL : w2)) ;
-    y = ((i*y_ratio)>>16);
-    y_diff = (i*y_ratio) - (y<<16) ;
-    uint32_t *p = (uint32_t*)(src_row) + (y*src_surface->w + x_padding_ratio) ;
-    int rat = 0;
-    for (int j=0;j<w2;j++)
-    {
-      if(j>=RES_HW_SCREEN_HORIZONTAL){
-        continue;
-      }
-      x = (rat>>16);
-      x_diff = rat - (x<<16) ;
-
-      /// --- Getting adjacent pixels ---
-      p_val_tl = p[x] ;
-      p_val_tr = (x+1<w1)?p[x+1]:p[x];
-      p_val_bl = (y+1<h1)?p[x+w1]:p[x];
-      p_val_br = (y+1<h1 && x+1<w1)?p[x+w1+1]:p[x];
-
-      // red element
-      // Yr = Ar(1-w)(1-h) + Br(w)(1-h) + Cr(h)(1-w) + Dr(wh)
-      red_comp = (( ((p_val_tl&0xFF000000)>>24) * ( (((1<<16)-x_diff) * ((1<<16)-y_diff)) >>8) )>>24) +
-          (( ((p_val_tr&0xFF000000)>>24) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
-            (( ((p_val_bl&0xFF000000)>>24) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
-            (( ((p_val_br&0xFF000000)>>24) * ((y_diff * x_diff) >>8) )>>24);
-
-      // green element
-      // Yg = Ag(1-w)(1-h) + Bg(w)(1-h) + Cg(h)(1-w) + Dg(wh)
-      green_comp = (( ((p_val_tl&0x00FF0000)>>16) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
-          (( ((p_val_tr&0x00FF0000)>>16) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
-            (( ((p_val_bl&0x00FF0000)>>16) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
-            (( ((p_val_br&0x00FF0000)>>16) * ((y_diff * x_diff) >>8) )>>24);
-
-      // blue element
-      // Yb = Ab(1-w)(1-h) + Bb(w)(1-h) + Cb(h)(1-w) + Db(wh)
-      blue_comp = (( ((p_val_tl&0x0000FF00)>>8) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
-          (( ((p_val_tr&0x0000FF00)>>8) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
-            (( ((p_val_bl&0x0000FF00)>>8) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
-            (( ((p_val_br&0x0000FF00)>>8) * ((y_diff * x_diff) >>8) )>>24);
-
-      // alpha element
-      // Ya = Aa(1-w)(1-h) + Ba(w)(1-h) + Ca(h)(1-w) + Da(wh)
-      alpha_comp = (( ((p_val_tl&0x000000FF)) * ((((1<<16)-x_diff) * ((1<<16)-y_diff))>>8) )>>24) +
-          (( ((p_val_tr&0x000000FF)) * ((x_diff * ((1<<16)-y_diff)) >>8) )>>24) +
-            (( ((p_val_bl&0x000000FF)) * ((y_diff * ((1<<16)-x_diff)) >>8) )>>24) +
-            (( ((p_val_br&0x000000FF)) * ((y_diff * x_diff) >>8) )>>24);
-
-     //   printf("red_comp=%d, green_comp=%d, blue_comp=%d, alpha_comp=%d, \n", red_comp, green_comp, blue_comp, alpha_comp);
-
-      /// --- Write pixel value ---
-      *t++ = ((red_comp<<24)&0xFF000000) + ((green_comp<<16)&0x00FF0000) + ((blue_comp<<8)&0x0000FF00) + ((alpha_comp)&0x000000FF);
-
-      /// --- Update x ----
-      rat += x_ratio;
-    }
-  }
-}
-
-
-void upscale_160x120_to_240x240_bilinearish(SDL_Surface *src_surface, SDL_Surface *dst_surface)
-{
-  if (src_surface->w != 160)
-  {
-    printf("src_surface->w (%d) != 160 \n", src_surface->w);
-    return;
-  }
-  if (src_surface->h != 120)
-  {
-    printf("src_surface->h (%d) != 120 \n", src_surface->h);
-    return;
-  }
-
-  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
-  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels;
-
-  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
-  // Horizontally: 240=80*3 160=80*2
-  // Vertically: 240=60*4 120=60*2
-  // Each block of 2*2 becomes 3x4.
-  uint32_t BlockX, BlockY;
-  uint32_t *BlockSrc;
-  uint32_t *BlockDst;
-  uint32_t _a, _b, _ab, _c, _d, _cd;
-  for (BlockY = 0; BlockY < 60; BlockY++)
-  {
-    BlockSrc = Src32 + BlockY * 160 * 2;
-    BlockDst = Dst32 + BlockY * 240 * 4;
-    for (BlockX = 0; BlockX < 80; BlockX++)
-    {
-      /* Horizontaly:
-       * Before(2):
-       * (a)(b)
-       * After(3):
-       * (a)(ab)(b)
-       */
-
-      /* Verticaly:
-       * Before(2):
-       * (1)(2)
-       * After(4):
-       * (1)(1112)(1222)(2)
-       */
-
-      // -- Line 1 --
-      _a = *(BlockSrc                          );
-      _b = *(BlockSrc                       + 1);
-      _ab = Weight1_1( _a,  _b);
-      *(BlockDst                               ) = _a;
-      *(BlockDst                            + 1) = _ab;
-      *(BlockDst                            + 2) = _b;
-
-      // -- Line 2 --
-      _c = *(BlockSrc             + 160 * 1    );
-      _d = *(BlockSrc             + 160 * 1 + 1);
-      _cd = Weight1_1( _c,  _d);
-      *(BlockDst                  + 240 * 1    ) = Weight3_1(_a, _c);
-      *(BlockDst                  + 240 * 1 + 1) = Weight3_1(_ab, _cd);
-      *(BlockDst                  + 240 * 1 + 2) = Weight3_1(_b, _d);
-
-      // -- Line 3 --
-      *(BlockDst                  + 240 * 2    ) = Weight1_3(_a, _c);
-      *(BlockDst                  + 240 * 2 + 1) = Weight1_3(_ab, _cd);
-      *(BlockDst                  + 240 * 2 + 2) = Weight1_3(_b, _d);
-
-      // -- Line 4 --
-      *(BlockDst                  + 240 * 3    ) = _c;
-      *(BlockDst                  + 240 * 3 + 1) = _cd;
-      *(BlockDst                  + 240 * 3 + 2) = _d;
-
-      BlockSrc += 2;
-      BlockDst += 3;
-    }
-  }
-}
-
-
-//void upscale_160x120_to_320x240_bilinearish_cropScreen(SDL_Surface *src_surface, SDL_Surface *dst_surface)
-//{
-//  if (src_surface->w != 160)
-//  {
-//    printf("src_surface->w (%d) != 160 \n", src_surface->w);
-//    return;
-//  }
-//  if (src_surface->h != 120)
-//  {
-//    printf("src_surface->h (%d) != 120 \n", src_surface->h);
-//    return;
-//  }
-
-//  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
-//  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels;
-//  uint32_t x_src_padding = 20;
-
-//  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
-//  // Horizontally: 320=80*4 160=80*2
-//  // Vertically: 240=60*4 120=60*2
-//  // Each block of 2*2 becomes 4x4.
-//  uint32_t BlockX, BlockY;
-//  uint32_t *BlockSrc;
-//  uint32_t *BlockDst;
-//  uint32_t _a, _b, _aaab, _abbb, _c, _d, _cccd, _cddd;
-//  for (BlockY = 0; BlockY < 60; BlockY++)
-//  {
-//    BlockSrc = Src32 + BlockY * 160 * 2 + x_src_padding;
-//    BlockDst = Dst32 + BlockY * 240 * 4;
-//    for (BlockX = 0; BlockX < 80-x_src_padding; BlockX++)
-//    {
-//      /* Horizontaly:
-//       * Before(2):
-//       * (a)(b)
-//       * After(3):
-//       * (a)(aaab)(abbb)(b)
-//       */
-
-//      /* Verticaly:
-//       * Before(2):
-//       * (1)(2)
-//       * After(4):
-//       * (1)(1112)(1222)(2)
-//       */
-
-//      // -- Line 1 --
-//      _a = *(BlockSrc                          );
-//      _b = *(BlockSrc                       + 1);
-//      _aaab = Weight3_1( _a,  _b);
-//      _abbb = Weight1_3( _a,  _b);
-//      *(BlockDst                               ) = _a;
-//      *(BlockDst                            + 1) = _aaab;
-//      *(BlockDst                            + 2) = _abbb;
-//      *(BlockDst                            + 3) = _b;
-
-//      // -- Line 2 --
-//      _c = *(BlockSrc             + 160 * 1    );
-//      _d = *(BlockSrc             + 160 * 1 + 1);
-//      _cccd = Weight3_1( _c,  _d);
-//      _cddd = Weight1_3( _c,  _d);
-//      *(BlockDst                  + 240 * 1    ) = Weight3_1(_a, _c);
-//      *(BlockDst                  + 240 * 1 + 1) = Weight3_1(_aaab, _cccd);
-//      *(BlockDst                  + 240 * 1 + 2) = Weight3_1(_abbb, _cddd);
-//      *(BlockDst                  + 240 * 1 + 3) = Weight3_1(_b, _d);
-
-//      // -- Line 3 --
-//      *(BlockDst                  + 240 * 2    ) = Weight1_3(_a, _c);
-//      *(BlockDst                  + 240 * 2 + 1) = Weight1_3(_aaab, _cccd);
-//      *(BlockDst                  + 240 * 2 + 2) = Weight1_3(_abbb, _cddd);
-//      *(BlockDst                  + 240 * 2 + 3) = Weight1_3(_b, _d);
-
-//      // -- Line 4 --
-//      *(BlockDst                  + 240 * 3    ) = _c;
-//      *(BlockDst                  + 240 * 3 + 1) = _cccd;
-//      *(BlockDst                  + 240 * 3 + 2) = _cddd;
-//      *(BlockDst                  + 240 * 3 + 3) = _d;
-
-//      BlockSrc += 2;
-//      BlockDst += 4;
-//    }
-//  }
-//}
-
-
-/// Interpolation with left, right pixels, pseudo gaussian weighting for downscaling - operations on 32bits
-void downscale_320x240_to_240x240_bilinearish(SDL_Surface *src_surface, SDL_Surface *dst_surface){
-  int w1=src_surface->w;
-  int h1=src_surface->h;
-  int w2=dst_surface->w;
-  int h2=dst_surface->h;
-
-  if(w1!=320){
-    printf("src_surface->w (%d) != 320\n", src_surface->w);
-    return;
-  }
-
-  //printf("src = %dx%d\n", w1, h1);
-  int y_ratio = (int)((h1<<16)/h2);
-  int y_padding = (RES_HW_SCREEN_VERTICAL-h2)/2;
-  int y1;
-  uint32_t *src_screen = (uint32_t *)src_surface->pixels;
-  uint32_t *dst_screen = (uint32_t *)dst_surface->pixels;
-
-  /* Interpolation */
-  for (int i=0;i<h2;i++)
-  {
-    if(i>=RES_HW_SCREEN_VERTICAL){
-      continue;
-    }
-    uint32_t* t = (uint32_t*)(dst_screen +
-      (i+y_padding)*((w2>RES_HW_SCREEN_HORIZONTAL)?RES_HW_SCREEN_HORIZONTAL:w2) );
-
-    // ------ current and next y value ------
-    y1 = ((i*y_ratio)>>16);
-    uint32_t* p = (uint32_t*)(src_screen + (y1*w1) );
-
-    for (int j=0;j<80;j++)
-    {
-      /* Horizontaly:
-       * Before(4):
-       * (a)(b)(c)(d)
-       * After(3):
-       * (aaab)(bc)(cddd)
-       */
-      uint32_t _a = *(p    );
-      uint32_t _b = *(p + 1);
-      uint32_t _c = *(p + 2);
-      uint32_t _d = *(p + 3);
-      *(t    ) = Weight3_1( _a, _b );
-      *(t + 1) = Weight1_1( _b, _c );
-      *(t + 2) = Weight1_3( _c, _d );
-
-      // ------ next dst pixel ------
-      t+=3;
-      p+=4;
-    }
-  }
-}
-
-
-void downscale_320x240_to_240x180_bilinearish(SDL_Surface *src_surface, SDL_Surface *dst_surface)
-{
-  if (src_surface->w != 320)
-  {
-    printf("src_surface->w (%d) != 320 \n", src_surface->w);
-    return;
-  }
-  if (src_surface->h != 240)
-  {
-    printf("src_surface->h (%d) != 240 \n", src_surface->h);
-    return;
-  }
-
-  /// Compute padding for centering when out of bounds
-  int y_padding = (RES_HW_SCREEN_VERTICAL-180)/2;
-
-  uint32_t *Src32 = (uint32_t *) src_surface->pixels;
-  uint32_t *Dst32 = (uint32_t *) dst_surface->pixels + y_padding*RES_HW_SCREEN_HORIZONTAL;
-
-  // There are 80 blocks of 2 pixels horizontally, and 48 of 3 horizontally.
-  // Horizontally: 320=80*4 240=80*3
-  // Vertically: 240=60*4 180=60*3
-  // Each block of 4*4 becomes 3*3
-  uint32_t BlockX, BlockY;
-  uint32_t *BlockSrc;
-  uint32_t *BlockDst;
-  for (BlockY = 0; BlockY < 60; BlockY++)
-  {
-    BlockSrc = Src32 + BlockY * 320 * 4;
-    BlockDst = Dst32 + BlockY * 240 * 3;
-    for (BlockX = 0; BlockX < 80; BlockX++)
-    {
-      /* Horizontaly:
-       * Before(4):
-       * (a)(b)(c)(d)
-       * After(3):
-       * (aaab)(bc)(cddd)
-       */
-
-      /* Verticaly:
-       * Before(2):
-       * (1)(2)(3)(4)
-       * After(4):
-       * (1112)(23)(3444)
-       */
-
-      // -- Data --
-      uint32_t _a1 = *(BlockSrc                          );
-      uint32_t _b1 = *(BlockSrc                       + 1);
-      uint32_t _c1 = *(BlockSrc                       + 2);
-      uint32_t _d1 = *(BlockSrc                       + 3);
-      uint32_t _a2 = *(BlockSrc             + 320 * 1    );
-      uint32_t _b2 = *(BlockSrc             + 320 * 1 + 1);
-      uint32_t _c2 = *(BlockSrc             + 320 * 1 + 2);
-      uint32_t _d2 = *(BlockSrc             + 320 * 1 + 3);
-      uint32_t _a3 = *(BlockSrc             + 320 * 2    );
-      uint32_t _b3 = *(BlockSrc             + 320 * 2 + 1);
-      uint32_t _c3 = *(BlockSrc             + 320 * 2 + 2);
-      uint32_t _d3 = *(BlockSrc             + 320 * 2 + 3);
-      uint32_t _a4 = *(BlockSrc             + 320 * 3    );
-      uint32_t _b4 = *(BlockSrc             + 320 * 3 + 1);
-      uint32_t _c4 = *(BlockSrc             + 320 * 3 + 2);
-      uint32_t _d4 = *(BlockSrc             + 320 * 3 + 3);
-
-      uint32_t _a2a2a2b2  = Weight3_1( _a2, _b2);
-      uint32_t _a3a3a3b3  = Weight3_1( _a3, _b3);
-      uint32_t _b2c2      = Weight1_1( _b2, _c2);
-      uint32_t _b3c3      = Weight1_1( _b3, _c3);
-      uint32_t _c2d2d2d2  = Weight1_3( _c2, _d2);
-      uint32_t _c3d3d3d3  = Weight1_3( _c3, _d3);
-
-      // -- Line 1 --
-      *(BlockDst                               ) = Weight3_1( Weight3_1( _a1, _b1), _a2a2a2b2             );
-      *(BlockDst                            + 1) = Weight3_1( Weight1_1( _b1, _c1), _b2c2                 );
-      *(BlockDst                            + 2) = Weight3_1( Weight1_3( _c1, _d1), _c2d2d2d2             );
-
-      // -- Line 2 --
-      *(BlockDst                  + 240 * 1    ) = Weight1_1( _a2a2a2b2           , _a3a3a3b3             );
-      *(BlockDst                  + 240 * 1 + 1) = Weight1_1( _b2c2               , _b3c3                 );
-      *(BlockDst                  + 240 * 1 + 2) = Weight1_1( _c2d2d2d2           , _c3d3d3d3             );
-
-      // -- Line 3 --
-      *(BlockDst                  + 240 * 2    ) = Weight1_3( _a3a3a3b3           , Weight3_1( _a4, _b4)  );
-      *(BlockDst                  + 240 * 2 + 1) = Weight1_3( _b3c3               , Weight1_1( _b4, _c4)  );
-      *(BlockDst                  + 240 * 2 + 2) = Weight1_3( _c3d3d3d3           , Weight1_3( _c4, _d4)  );
-
-      BlockSrc += 4;
-      BlockDst += 3;
-    }
-  }
-}
-
-// void gfx_sdl_upscale_to_screen(void) {
-//    /*#ifndef SDL_SURFACE
-//    SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-//    #else
-//      SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-//    #endif*/
-
-//   /** Clear screen on aspect ratio change */
-//   static prev_aspect_ratio = ASPECT_RATIOS_TYPE_SCALED;
-//   if(prev_aspect_ratio != aspect_ratio){
-//     prev_aspect_ratio = aspect_ratio;
-//     clear_screen(texture);
-//   }
-
-//   switch (aspect_ratio){
-
-//     /** Stretched */
-//     case ASPECT_RATIOS_TYPE_STRETCHED:
-//     if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-//       upscale_160x120_to_240x240_bilinearish(sdl_screen, texture);
-//     }
-//     else if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
-//       downscale_320x240_to_240x240_bilinearish(sdl_screen, texture);
-//     }
-//     else{
-//       flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL); 
-//     }
-//     break;
-
-//     /** Scaled */
-//     case ASPECT_RATIOS_TYPE_SCALED:
-//     if(resolutions[current_res_idx].w==320 && resolutions[current_res_idx].h==240){
-//       downscale_320x240_to_240x180_bilinearish(sdl_screen, texture);
-//     }
-//     else{
-//       flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, configScreenHeight*RES_HW_SCREEN_HORIZONTAL/configScreenWidth);
-//     }
-//     break;
-
-//     /** Cropped */
-//     case ASPECT_RATIOS_TYPE_CROPPED:
-//     if (current_res_idx==0) {
-//       SDL_BlitSurface(sdl_screen, &middle_rect, texture, NULL);
-//     }
-//     else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-//       upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, texture);
-//     }
-//     else{
-//       flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
-//     }
-//     break;
-
-//     default:
-//     printf("Wrong aspect ratio value: %s, setting cropped\n", aspect_ratio);
-//     aspect_ratio = ASPECT_RATIOS_TYPE_CROPPED;
-//     break;
-//   }
-
-//   //flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], texture, RES_HW_SCREEN_HORIZONTAL, RES_HW_SCREEN_VERTICAL);
-//   //flip_NNOptimized_AllowOutOfScreen(sdl_screen, ptr_src_rect, texture, 320, RES_HW_SCREEN_VERTICAL);
-//   //SDL_BlitSurface(sdl_screen, NULL, texture, NULL);
-// }
-
-
 static SDL_Rect middle_rect = {40,0,240,240};
 
 void gfx_sdl_upscale_to_fullscreen(void) {
   if (current_res_idx==0) {
     return;
   }
-//  else if(resolutions[current_res_idx].w==160 && resolutions[current_res_idx].h==120){
-//    upscale_160x120_to_320x240_bilinearish_cropScreen(sdl_screen, sdl_screen_subRes[0]);
-//  }
   else{
     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], sdl_screen_subRes[0], configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
   }
@@ -1143,9 +668,8 @@ static void gfx_sdl_swap_buffers_begin(void) {
 #endif
 	  SDL_Flip(sdl_screen);
 #else
-    //gfx_sdl_upscale_to_screen();
     SDL_BlitSurface(sdl_screen_subRes[0], &middle_rect, texture, NULL);
-	
+
     SDL_Flip(texture);
 #endif
 #else
@@ -1165,7 +689,7 @@ static void gfx_sdl_swap_buffers_end(void) {
           set_higherRes(dichotomic_res_change, true);
         }
         else if(too_slow_in_a_row >= MAX_TOO_SLOW_IN_A_ROW && (current_res_idx < NB_SUBRESOLUTIONS-1) ){
-          
+
           too_slow_in_a_row = 0;
           set_lowerRes(dichotomic_res_change, true);
         }
