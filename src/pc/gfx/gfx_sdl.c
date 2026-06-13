@@ -357,7 +357,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       current_res_idx = 0;
       sdl_screen = sdl_screen_subRes[current_res_idx];
 
-      //init_menu_SDL();
+      init_menu_SDL();
     #endif
   #endif
 	#ifdef SDL_SURFACE
@@ -491,11 +491,11 @@ static void gfx_sdl_handle_events(void) {
 
                   case SDLK_q:
                   case SDLK_HOME:
-                  game_exit();
-                  //run_menu_loop();
-                  //clear_screen(texture);
-                  //last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
-                  //last = tick; // same
+                  //game_exit();
+                  run_menu_loop();
+                  clear_screen(texture);
+                  last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
+                  last = tick; // same
                   break;
 
                   // case SDLK_h:
