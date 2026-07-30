@@ -37,7 +37,7 @@
 #define SCREEN_VERTICAL_SIZE        RES_HW_SCREEN_VERTICAL
 
 #define SCROLL_SPEED_PX             30
-#define FPS_MENU                    50
+#define FPS_MENU                    60
 #define ARROWS_PADDING              8
 
 #define MENU_ZONE_WIDTH             SCREEN_HORIZONTAL_SIZE
