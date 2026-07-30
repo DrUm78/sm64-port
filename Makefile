@@ -244,7 +244,7 @@ else
       BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_funkey
     else
       ifeq ($(TARGET_OD),1)
-        BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_gcw0
+        BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_350h
       else
         BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
       endif
@@ -554,7 +554,7 @@ ifeq ($(TARGET_OD),1)
   CC := $(OD_TOOLCHAIN)bin/mipsel-linux-gcc
   CXX := $(OD_TOOLCHAIN)bin/mipsel-linux-g++
   LD := $(OD_TOOLCHAIN)bin/mipsel-linux-gcc
-  MARCH := -march=mips32r2 -mtune=mips32r2 -Ofast -fno-fast-math -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mplt -mno-shared -fno-PIC -flto -fno-builtin -mno-memcpy -fsection-anchors -fdelete-dead-exceptions -DGCW0
+  MARCH := -march=mips32r2 -mtune=mips32r2 -Ofast -fno-fast-math -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mplt -mno-shared -fno-PIC -flto -fno-builtin -mno-memcpy -fsection-anchors -fdelete-dead-exceptions -DTARGET_OD
 endif
   PLATFORM_CFLAGS  := -DTARGET_LINUX
   PLATFORM_LDFLAGS := -lm -lpthread -no-pie -flto

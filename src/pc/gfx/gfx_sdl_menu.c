@@ -45,7 +45,7 @@
 #define MENU_BG_SQUARE_WIDTH        180
 #define MENU_BG_SQUARE_HEIGHT       140
 
-#if defined(GCW0)
+#if defined(TARGET_OD)
 #define MENU_FONT_NAME_TITLE        "menu_resources/OpenSans-Bold.ttf"
 #define MENU_FONT_SIZE_TITLE        22
 #define MENU_FONT_NAME_INFO         "menu_resources/OpenSans-Bold.ttf"
