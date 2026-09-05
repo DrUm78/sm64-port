@@ -398,6 +398,14 @@ static Color4 combine_tex_rgba_decal(const float z, const float *props) {
     return rgba_blend(tc, cc, tc.a);
 }
 
+static Color4 combine_tex_rgba_decal_texa(const float z, const float *props) {
+    const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
+    const Color4 cc = (Color4) {{ .r = props[2] * z, .g = props[3] * z, .b = props[4] * z, .a = props[5] * z }};
+    Color4 out = rgba_blend(tc, cc, tc.a);
+    out.a = mult_tab[tc.a][cc.a];
+    return out;
+}
+
 static Color4 combine_tex_rgb_rgb(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const Color4 cc1 = (Color4) {{ .r = props[2] * z, .g = props[3] * z, .b = props[4] * z, 0xFF }};
@@ -745,7 +753,14 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
         if (ccf.num_inputs > 1)
             prg->combine = combine_tex_rgb_rgb; // only one such known shader
         else if (shader_id == 0x0000038D || shader_id == 0x01200A00 || shader_id == 0x01045A00 || shader_id == 0x0120038D)
-            prg->combine = ccf.opt_alpha ? combine_tex_rgba_decal : combine_tex_rgb_decal;
+            if (ccf.opt_alpha) {
+                bool alpha_uses_texel = false;
+                for (int k = 0; k < 4; k++)
+                    if (ccf.c[1][k] == SHADER_TEXEL0 || ccf.c[1][k] == SHADER_TEXEL0A)
+                        alpha_uses_texel = true;
+                prg->combine = alpha_uses_texel ? combine_tex_rgba_decal_texa : combine_tex_rgba_decal;
+            } else
+                prg->combine = combine_tex_rgb_decal;
         else if (ccf.opt_fog)
             prg->combine = ccf.opt_alpha ? combine_tex_fog_rgba : combine_tex_fog_rgb;
         else if (ccf.opt_alpha)
