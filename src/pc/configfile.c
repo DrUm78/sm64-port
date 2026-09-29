@@ -33,9 +33,9 @@ struct ConfigOption {
  */
 bool configFullscreen SAVESTATE_EXCLUDE = true;
 bool configDrawSky               = true;
-bool configFiltering             = false;
+bool configFiltering             = true;
 bool configEnableSound           = true;
-bool configEnableFog             = false;
+bool configEnableFog             = true;
 #ifdef RS97
 unsigned int configScreenWidth   = 80;
 unsigned int configScreenHeight  = 60;

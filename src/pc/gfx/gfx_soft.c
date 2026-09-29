@@ -102,6 +102,7 @@ struct Texture {
     int w, h;           // size
     float fw, fh;       // float size because float conversion bad
     int wrap_w, wrap_h; // size - 1 for wrapping
+    uint8_t wrap_mode_x, wrap_mode_y; // WRAP_* per axis, resolved once (avoids indirect call per fetch)
     bool filter;        // linear filter
     uint32_t addr;      // offset into texcache
     sample_fn_t sample; // sampling function (does wrapping/clamping)
@@ -162,13 +163,6 @@ static int scr_width SAVESTATE_EXCLUDE;
 static int scr_height SAVESTATE_EXCLUDE;
 static int scr_size SAVESTATE_EXCLUDE; // scr_width * scr_height
 
-// color component interpolation table:
-// lerp(x, y, t) = x + (y - x) * t
-// the first index is x, the second is (y - x) + 256
-static uint8_t lerp_tab[256][256 * 2 + 1];
-// color component multiplication table: [x][y] = (x * y) / 256;
-static uint8_t mult_tab[256][256];
-// dither kernel for unreal texture filtering
 static const Vector2 dither_tab[2][2] = {
     { {{ 0.25f, 0.00f }}, {{ 0.50f, 0.75f }} },
     { {{ 0.75f, 0.50f }}, {{ 0.00f, 0.25f }} },
@@ -218,30 +212,32 @@ static inline Vector4 vec4_lerp(const Vector4 *v1, const Vector4 *v2, const floa
 }
 
 static inline Color4 rgba_modulate(const Color4 c1, const Color4 c2) {
+    // integer equivalent of the old mult_tab: (x * y) / 256
     return (Color4) {{
-        .r = mult_tab[c1.r][c2.r],
-        .g = mult_tab[c1.g][c2.g],
-        .b = mult_tab[c1.b][c2.b],
-        .a = mult_tab[c1.a][c2.a],
+        .r = (uint8_t)((c1.r * c2.r + 127) >> 8),
+        .g = (uint8_t)((c1.g * c2.g + 127) >> 8),
+        .b = (uint8_t)((c1.b * c2.b + 127) >> 8),
+        .a = (uint8_t)((c1.a * c2.a + 127) >> 8),
     }};
 }
 
 static inline Color4 rgba_blend(const Color4 src, const Color4 dst, const uint8_t a) {
-    const uint8_t ia = 0xFF - a;
+    const uint8_t ia = 255 - a;
     return (Color4) {{
-        .r = mult_tab[src.r][a] + mult_tab[dst.r][ia],
-        .g = mult_tab[src.g][a] + mult_tab[dst.g][ia],
-        .b = mult_tab[src.b][a] + mult_tab[dst.b][ia],
+        .r = (uint8_t)((src.r * a + dst.r * ia + 127) >> 8),
+        .g = (uint8_t)((src.g * a + dst.g * ia + 127) >> 8),
+        .b = (uint8_t)((src.b * a + dst.b * ia + 127) >> 8),
         .a = dst.a,
     }};
 }
 
 static inline Color4 rgba_lerp(const Color4 c1, const Color4 c2, const uint8_t t) {
+    // integer equivalent of the old lerp_tab: c1 + t * (c2 - c1)
     return (Color4) {{
-        .r = c1.r + lerp_tab[t][0xFF + c2.r - c1.r],
-        .g = c1.g + lerp_tab[t][0xFF + c2.g - c1.g],
-        .b = c1.b + lerp_tab[t][0xFF + c2.b - c1.b],
-        .a = c1.a + lerp_tab[t][0xFF + c2.a - c1.a],
+        .r = (uint8_t)((c2.r * t + c1.r * (255 - t) + 127) >> 8),
+        .g = (uint8_t)((c2.g * t + c1.g * (255 - t) + 127) >> 8),
+        .b = (uint8_t)((c2.b * t + c1.b * (255 - t) + 127) >> 8),
+        .a = (uint8_t)((c2.a * t + c1.a * (255 - t) + 127) >> 8),
     }};
 }
 
@@ -314,9 +310,42 @@ static inline Color4 tex_sample_nearest(const struct Texture * const tex, const 
     return tex->sample(tex, x, y);
 }
 
+static inline Color4 tex_sample_bilinear_f(const struct Texture * const tex, const float u, const float v) {
+    const float xf = u * tex->fw;
+    const float yf = v * tex->fh;
+    int x0 = (int)xf;
+    int y0 = (int)yf;
+    if (xf < (float)x0) --x0;
+    if (yf < (float)y0) --y0;
+    int fx = (int)((xf - (float)x0) * 256.f);
+    int fy = (int)((yf - (float)y0) * 256.f);
+    if (fx > 255) fx = 255;
+    if (fy > 255) fy = 255;
+
+    const Color4 d00 = tex->sample(tex, x0,     y0);
+    const Color4 d10 = tex->sample(tex, x0 + 1, y0);
+    const Color4 d01 = tex->sample(tex, x0,     y0 + 1);
+    const Color4 d11 = tex->sample(tex, x0 + 1, y0 + 1);
+
+    Color4 o;
+    o.r = (uint8_t)((((d00.r * (256 - fx) + d10.r * fx) >> 8) * (256 - fy)
+                   + ((d01.r * (256 - fx) + d11.r * fx) >> 8) * fy) >> 8);
+    o.g = (uint8_t)((((d00.g * (256 - fx) + d10.g * fx) >> 8) * (256 - fy)
+                   + ((d01.g * (256 - fx) + d11.g * fx) >> 8) * fy) >> 8);
+    o.b = (uint8_t)((((d00.b * (256 - fx) + d10.b * fx) >> 8) * (256 - fy)
+                   + ((d01.b * (256 - fx) + d11.b * fx) >> 8) * fy) >> 8);
+    o.a = (uint8_t)((((d00.a * (256 - fx) + d10.a * fx) >> 8) * (256 - fy)
+                   + ((d01.a * (256 - fx) + d11.a * fx) >> 8) * fy) >> 8);
+    return o;
+}
+
+static inline Color4 tex_sample_filtered(const struct Texture * const tex, const float u, const float v) {
+    return tex->filter ? tex_sample_bilinear_f(tex, u, v) : tex_sample_nearest(tex, u, v);
+}
+
 /* color combiners */
 
-#define tex_sample tex_sample_nearest
+#define tex_sample tex_sample_filtered
 
 static Color4 combine_rgb(const float z, const float *props) {
     return (Color4) {{ .r = props[0] * z, .g = props[1] * z, .b = props[2] * z, .a = 0xFF }};
@@ -335,7 +364,8 @@ static Color4 combine_fog_rgb(const float z, const float *props) {
 static Color4 combine_fog_rgba(const float z, const float *props) {
     const uint8_t fog = props[0] * z;
     const Color4 c = (Color4) {{ .r = props[1] * z, .g = props[2] * z, .b = props[3] * z, .a = props[4] * z }};
-    return rgba_blend(fog_color, c, fog);
+    const Color4 out = rgba_blend(fog_color, c, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = c.a }};
 }
 
 static Color4 combine_rgba_rgba(const float z, const float *props) {
@@ -351,7 +381,8 @@ static Color4 combine_tex(const float z, const float *props) {
 static Color4 combine_tex_fog(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const uint8_t fog = props[2] * z;
-    return rgba_blend(fog_color, tc, fog);
+    const Color4 out = rgba_blend(fog_color, tc, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = tc.a }};
 }
 
 static Color4 combine_tex_rgb(const float z, const float *props) {
@@ -389,7 +420,9 @@ static Color4 combine_tex_fog_rgba(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const uint8_t fog = props[2] * z;
     const Color4 cc = (Color4) {{ .r = props[3] * z, .g = props[4] * z, .b = props[5] * z, .a = props[6] * z }};
-    return rgba_blend(fog_color, rgba_modulate(tc, cc), fog);
+    const Color4 mod = rgba_modulate(tc, cc);
+    const Color4 out = rgba_blend(fog_color, mod, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = mod.a }};
 }
 
 static Color4 combine_tex_rgba_decal(const float z, const float *props) {
@@ -402,8 +435,35 @@ static Color4 combine_tex_rgba_decal_texa(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const Color4 cc = (Color4) {{ .r = props[2] * z, .g = props[3] * z, .b = props[4] * z, .a = props[5] * z }};
     Color4 out = rgba_blend(tc, cc, tc.a);
-    out.a = mult_tab[tc.a][cc.a];
+    out.a = (uint8_t)((tc.a * cc.a + 127) >> 8);
     return out;
+}
+
+static Color4 combine_tex_fog_rgb_decal(const float z, const float *props) {
+    const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
+    const uint8_t fog = props[2] * z;
+    const Color4 cc = (Color4) {{ .r = props[3] * z, .g = props[4] * z, .b = props[5] * z, .a = 0xFF }};
+    const Color4 base = rgba_blend(tc, cc, tc.a); // base.a == 0xFF here
+    const Color4 out = rgba_blend(fog_color, base, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = base.a }};
+}
+
+static Color4 combine_tex_fog_rgba_decal(const float z, const float *props) {
+    const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
+    const uint8_t fog = props[2] * z;
+    const Color4 cc = (Color4) {{ .r = props[3] * z, .g = props[4] * z, .b = props[5] * z, .a = props[6] * z }};
+    const Color4 base = rgba_blend(tc, cc, tc.a); // base.a == cc.a
+    const Color4 out = rgba_blend(fog_color, base, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = base.a }};
+}
+
+static Color4 combine_tex_fog_rgba_decal_texa(const float z, const float *props) {
+    const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
+    const uint8_t fog = props[2] * z;
+    const Color4 cc = (Color4) {{ .r = props[3] * z, .g = props[4] * z, .b = props[5] * z, .a = props[6] * z }};
+    const Color4 base = rgba_blend(tc, cc, tc.a);
+    const Color4 out = rgba_blend(fog_color, base, fog);
+    return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = (uint8_t)((tc.a * cc.a + 127) >> 8) }};
 }
 
 static Color4 combine_tex_rgb_rgb(const float z, const float *props) {
@@ -476,23 +536,38 @@ static void draw_pixel_zwrite(const int idx, const uint16_t z, Color4 src) {
     z_buffer[idx] = z;
 }
 
+static inline Color4 gfx_read_dst(const int idx) {
+#ifdef CONVERT
+    const uint16_t d = gfx_output[idx];
+    const int r5 = (d >> 11) & 0x1F, g6 = (d >> 5) & 0x3F, b5 = d & 0x1F;
+    return (Color4) {{
+        .r = (uint8_t)((r5 << 3) | (r5 >> 2)),
+        .g = (uint8_t)((g6 << 2) | (g6 >> 4)),
+        .b = (uint8_t)((b5 << 3) | (b5 >> 2)),
+        .a = 0xFF,
+    }};
+#else
+    return (Color4) { .c = Color32Reverse(gfx_output[idx]) };
+#endif
+}
+
 static void draw_pixel_blend(const int idx, UNUSED const uint16_t z, Color4 src) {
     const uint8_t a = src.a;
     const uint8_t ia = 255 - a;
-    const Color4 dst = (Color4) { .c = Color32Reverse(gfx_output[idx]) };
-    src.r = mult_tab[src.r][a] + mult_tab[dst.r][ia];
-    src.g = mult_tab[src.g][a] + mult_tab[dst.g][ia];
-    src.b = mult_tab[src.b][a] + mult_tab[dst.b][ia];
+    const Color4 dst = gfx_read_dst(idx);
+    src.r = (uint8_t)((src.r * a + dst.r * ia + 127) >> 8);
+    src.g = (uint8_t)((src.g * a + dst.g * ia + 127) >> 8);
+    src.b = (uint8_t)((src.b * a + dst.b * ia + 127) >> 8);
     gfx_output[idx] = Color32Reverse(src.c);
 }
 
 static void draw_pixel_blend_zwrite(const int idx, const uint16_t z, Color4 src) {
     const uint8_t a = src.a;
     const uint8_t ia = 255 - a;
-    const Color4 dst = (Color4) { .c = Color32Reverse(gfx_output[idx]) };
-    src.r = mult_tab[src.r][a] + mult_tab[dst.r][ia];
-    src.g = mult_tab[src.g][a] + mult_tab[dst.g][ia];
-    src.b = mult_tab[src.b][a] + mult_tab[dst.b][ia];
+    const Color4 dst = gfx_read_dst(idx);
+    src.r = (uint8_t)((src.r * a + dst.r * ia + 127) >> 8);
+    src.g = (uint8_t)((src.g * a + dst.g * ia + 127) >> 8);
+    src.b = (uint8_t)((src.b * a + dst.b * ia + 127) >> 8);
     gfx_output[idx] = Color32Reverse(src.c);
     z_buffer[idx] = z;
 }
@@ -501,10 +576,10 @@ static void draw_pixel_blend_edge(const int idx, UNUSED const uint16_t z, Color4
     if (src.a > 0x80) {
         const uint8_t a = src.a;
         const uint8_t ia = 255 - a;
-        const Color4 dst = (Color4) { .c = Color32Reverse(gfx_output[idx]) };
-        src.r = mult_tab[src.r][a] + mult_tab[dst.r][ia];
-        src.g = mult_tab[src.g][a] + mult_tab[dst.g][ia];
-        src.b = mult_tab[src.b][a] + mult_tab[dst.b][ia];
+        const Color4 dst = gfx_read_dst(idx);
+        src.r = (uint8_t)((src.r * a + dst.r * ia + 127) >> 8);
+        src.g = (uint8_t)((src.g * a + dst.g * ia + 127) >> 8);
+        src.b = (uint8_t)((src.b * a + dst.b * ia + 127) >> 8);
         gfx_output[idx] = Color32Reverse(src.c);
     }
 }
@@ -513,10 +588,10 @@ static void draw_pixel_blend_edge_zwrite(const int idx, const uint16_t z, Color4
     if (src.a > 0x80) {
         const uint8_t a = src.a;
         const uint8_t ia = 255 - a;
-        const Color4 dst = (Color4) { .c = Color32Reverse(gfx_output[idx]) };
-        src.r = mult_tab[src.r][a] + mult_tab[dst.r][ia];
-        src.g = mult_tab[src.g][a] + mult_tab[dst.g][ia];
-        src.b = mult_tab[src.b][a] + mult_tab[dst.b][ia];
+        const Color4 dst = gfx_read_dst(idx);
+        src.r = (uint8_t)((src.r * a + dst.r * ia + 127) >> 8);
+        src.g = (uint8_t)((src.g * a + dst.g * ia + 127) >> 8);
+        src.b = (uint8_t)((src.b * a + dst.b * ia + 127) >> 8);
         gfx_output[idx] = Color32Reverse(src.c);
         z_buffer[idx] = z;
     }
@@ -655,6 +730,686 @@ DEFINE_RAST_FUNC(12)
 DEFINE_RAST_FUNC(13)
 DEFINE_RAST_FUNC(14)
 
+#ifndef CONVERT
+typedef uint32_t opt_pix_t;
+#else
+typedef uint16_t opt_pix_t; // RGB565, halves framebuffer bandwidth
+#endif
+
+#define OPT_STEP 8   /* 4 on MIPS32r2 if banding appears, 16 for more speed */
+
+// RGB565 pack/unpack for the CONVERT build (matches Color32Reverse(CONVERT):
+// input r in bits 0-7, g in 8-15, b in 16-23 -> r<<11 | g<<5 | b)
+static inline uint16_t opt_pack565(const int r, const int g, const int b) {
+    return (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+}
+static inline void opt_unpack565(const uint16_t d, int *r, int *g, int *b) {
+    const int r5 = (d >> 11) & 0x1F, g6 = (d >> 5) & 0x3F, b5 = d & 0x1F;
+    *r = (r5 << 3) | (r5 >> 2);
+    *g = (g6 << 2) | (g6 >> 4);
+    *b = (b5 << 3) | (b5 >> 2);
+}
+
+// pixel write/read valid in both 32bpp and CONVERT (RGB565) builds
+static inline void opt_put(opt_pix_t *dst, const int r, const int g, const int b) {
+#ifndef CONVERT
+    *dst = 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+#else
+    *dst = opt_pack565(r, g, b);
+#endif
+}
+static inline void opt_get(const opt_pix_t *src, int *r, int *g, int *b) {
+#ifndef CONVERT
+    *r = (*src >> 16) & 0xFF;
+    *g = (*src >> 8) & 0xFF;
+    *b = *src & 0xFF;
+#else
+    opt_unpack565(*src, r, g, b);
+#endif
+}
+
+static inline int opt_wrap(const int c, const int wrap, const uint8_t mode) {
+    if (mode == WRAP_REPEAT) return c & wrap;
+    if (mode == WRAP_CLAMP) return iclamp0w(c, wrap);
+    return imirror0w(c, wrap);
+}
+
+/* --- opaque textured (tex_rgb): v3 path, unchanged --- */
+static void opt_scan_tex_rgb(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int rr = (int)(p[6] * w0);
+        int gg = (int)(p[7] * w0);
+        int bb = (int)(p[8] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[9];
+        for (int i = 2; i < 9; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int rr1 = (int)(q[6] * w1);
+        const int gg1 = (int)(q[7] * w1);
+        const int bb1 = (int)(q[8] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            uint32_t tc;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                const uint32_t c00 = tpix[yb * tex->w + xb];
+                const uint32_t c10 = tpix[yb * tex->w + xn];
+                const uint32_t c01 = tpix[yn * tex->w + xb];
+                const uint32_t c11 = tpix[yn * tex->w + xn];
+                uint32_t out = 0xFF000000u;
+                for (uint32_t ch = 0; ch < 3; ++ch) {
+                    const uint32_t sh = ch * 8;
+                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
+                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
+                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
+                }
+                tc = out;
+            } else {
+                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                const int tr = (tc & 0xFF) * rr;
+                const int tg = ((tc >> 8) & 0xFF) * gg;
+                const int tb = ((tc >> 16) & 0xFF) * bb;
+                opt_put(dst, (tr + 127) >> 8, (tg + 127) >> 8, (tb + 127) >> 8);
+                if (z_write) *zb = (uint16_t)zz;
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv;
+            rr += dr; gg += dg; bb += db;
+            zz += dz;
+        }
+        for (int i = 2; i < 9; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- textured + alpha (tex_rgba): blend / texture_edge variants --- */
+static void opt_scan_tex_rgba(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int rr = (int)(p[6] * w0);
+        int gg = (int)(p[7] * w0);
+        int bb = (int)(p[8] * w0);
+        int aa = (int)(p[9] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[10];
+        for (int i = 2; i < 10; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int rr1 = (int)(q[6] * w1);
+        const int gg1 = (int)(q[7] * w1);
+        const int bb1 = (int)(q[8] * w1);
+        const int aa1 = (int)(q[9] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int da = (aa1 - aa) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            uint32_t tc;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                const uint32_t c00 = tpix[yb * tex->w + xb];
+                const uint32_t c10 = tpix[yb * tex->w + xn];
+                const uint32_t c01 = tpix[yn * tex->w + xb];
+                const uint32_t c11 = tpix[yn * tex->w + xn];
+                uint32_t out = 0;
+                for (uint32_t ch = 0; ch < 4; ++ch) {
+                    const uint32_t sh = ch * 8;
+                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
+                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
+                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
+                }
+                tc = out;
+            } else {
+                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                // modulate texel by vertex rgba (integer, no tables)
+                const int sr = ((tc & 0xFF) * rr + 127) >> 8;
+                const int sg = (((tc >> 8) & 0xFF) * gg + 127) >> 8;
+                const int sb = (((tc >> 16) & 0xFF) * bb + 127) >> 8;
+                const int sa = (((tc >> 24) & 0xFF) * aa + 127) >> 8;
+                if (!do_blend) {
+                    // opaque write (draw_pixel / draw_pixel_zwrite)
+                    opt_put(dst, sr, sg, sb);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (!do_edge || sa > 0x80) {
+                    // full blend, or edge blend above threshold
+                    if (sa >= 255) {
+                        opt_put(dst, sr, sg, sb);
+                    } else if (sa > 0) {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int ia = 255 - sa;
+                        const int orr = (sr * sa + dr_ * ia + 127) >> 8;
+                        const int og = (sg * sa + dg_ * ia + 127) >> 8;
+                        const int ob = (sb * sa + db_ * ia + 127) >> 8;
+                        opt_put(dst, orr, og, ob);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (z_write) {
+                    // edge mode below threshold: original draw_pixel_blend_edge
+                    // skips BOTH color and z writes
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv;
+            rr += dr; gg += dg; bb += db; aa += da;
+            zz += dz;
+        }
+        for (int i = 2; i < 10; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- vertex color + alpha (rgba): mist, transparent geometry --- */
+static void opt_scan_rgba(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, UNUSED const struct Texture * const tex) {
+    const int zoff = (int)z_offset;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int rr = (int)(p[4] * w0);
+        int gg = (int)(p[5] * w0);
+        int bb = (int)(p[6] * w0);
+        int aa = (int)(p[7] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[8];
+        for (int i = 2; i < 8; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int rr1 = (int)(q[4] * w1);
+        const int gg1 = (int)(q[5] * w1);
+        const int bb1 = (int)(q[6] * w1);
+        const int aa1 = (int)(q[7] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int da = (aa1 - aa) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (!do_blend) {
+                    opt_put(dst, rr, gg, bb);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (!do_edge || aa > 0x80) {
+                    if (aa >= 255) {
+                        opt_put(dst, rr, gg, bb);
+                    } else if (aa > 0) {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int ia = 255 - aa;
+                        const int orr = (rr * aa + dr_ * ia + 127) >> 8;
+                        const int og = (gg * aa + dg_ * ia + 127) >> 8;
+                        const int ob = (bb * aa + db_ * ia + 127) >> 8;
+                        opt_put(dst, orr, og, ob);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            rr += dr; gg += dg; bb += db; aa += da;
+            zz += dz;
+        }
+        for (int i = 2; i < 8; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- opaque vertex color (rgb): HUD, untextured geometry --- */static void opt_scan_rgb(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, UNUSED const struct Texture * const tex) {
+    const int zoff = (int)z_offset;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int rr = (int)(p[4] * w0);
+        int gg = (int)(p[5] * w0);
+        int bb = (int)(p[6] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[7];
+        for (int i = 2; i < 7; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int rr1 = (int)(q[4] * w1);
+        const int gg1 = (int)(q[5] * w1);
+        const int bb1 = (int)(q[6] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            if (!z_test || (uint16_t)zz <= *zb) {
+                opt_put(dst, rr, gg, bb);
+                if (z_write) *zb = (uint16_t)zz;
+            }
+            ++dst; ++zb;
+            rr += dr; gg += dg; bb += db;
+            zz += dz;
+        }
+        for (int i = 2; i < 7; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- untextured + fog (combine_fog_rgb): distant terrain, walls --- */
+static void opt_scan_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, UNUSED const struct Texture * const tex) {
+    const int zoff = (int)z_offset;
+    const int fcr = fog_color.r, fcg = fog_color.g, fcb = fog_color.b;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int ff = (int)(p[4] * w0);
+        int rr = (int)(p[5] * w0);
+        int gg = (int)(p[6] * w0);
+        int bb = (int)(p[7] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[8];
+        for (int i = 2; i < 8; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int ff1 = (int)(q[4] * w1);
+        const int rr1 = (int)(q[5] * w1);
+        const int gg1 = (int)(q[6] * w1);
+        const int bb1 = (int)(q[7] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int df = (ff1 - ff) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                const int ia = 255 - ff;
+                opt_put(dst,
+                    (ia * rr + ff * fcr + 127) >> 8,
+                    (ia * gg + ff * fcg + 127) >> 8,
+                    (ia * bb + ff * fcb + 127) >> 8);
+                if (z_write) *zb = (uint16_t)zz;
+            }
+            ++dst; ++zb;
+            ff += df; rr += dr; gg += dg; bb += db;
+            zz += dz;
+        }
+        for (int i = 2; i < 8; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- textured + fog, no shade (combine_tex_fog) --- */
+static void opt_scan_tex_fog(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const int fcr = fog_color.r, fcg = fog_color.g, fcb = fog_color.b;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int ff = (int)(p[6] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[7];
+        for (int i = 2; i < 7; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int ff1 = (int)(q[6] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int df = (ff1 - ff) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            uint32_t tc;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                const uint32_t c00 = tpix[yb * tex->w + xb];
+                const uint32_t c10 = tpix[yb * tex->w + xn];
+                const uint32_t c01 = tpix[yn * tex->w + xb];
+                const uint32_t c11 = tpix[yn * tex->w + xn];
+                uint32_t out = 0;
+                for (uint32_t ch = 0; ch < 4; ++ch) {
+                    const uint32_t sh = ch * 8;
+                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
+                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
+                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
+                }
+                tc = out;
+            } else {
+                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                const int ia = 255 - ff;
+                const int fr = (ia * (int)(tc & 0xFF)          + ff * fcr + 127) >> 8;
+                const int fg = (ia * (int)((tc >> 8) & 0xFF)   + ff * fcg + 127) >> 8;
+                const int fb = (ia * (int)((tc >> 16) & 0xFF)  + ff * fcb + 127) >> 8;
+                const int ta = (tc >> 24) & 0xFF;
+                if (!do_blend) {
+                    opt_put(dst, fr, fg, fb);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (!do_edge || ta > 0x80) {
+                    if (ta >= 255) {
+                        opt_put(dst, fr, fg, fb);
+                    } else if (ta > 0) {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int iat = 255 - ta;
+                        opt_put(dst,
+                            (fr * ta + dr_ * iat + 127) >> 8,
+                            (fg * ta + dg_ * iat + 127) >> 8,
+                            (fb * ta + db_ * iat + 127) >> 8);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv; ff += df;
+            zz += dz;
+        }
+        for (int i = 2; i < 7; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- textured + fog + shade (combine_tex_fog_rgb): the common case --- */
+static void opt_scan_tex_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const int fcr = fog_color.r, fcg = fog_color.g, fcb = fog_color.b;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int ff = (int)(p[6] * w0);
+        int rr = (int)(p[7] * w0);
+        int gg = (int)(p[8] * w0);
+        int bb = (int)(p[9] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[10];
+        for (int i = 2; i < 10; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int ff1 = (int)(q[6] * w1);
+        const int rr1 = (int)(q[7] * w1);
+        const int gg1 = (int)(q[8] * w1);
+        const int bb1 = (int)(q[9] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int df = (ff1 - ff) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            uint32_t tc;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                const uint32_t c00 = tpix[yb * tex->w + xb];
+                const uint32_t c10 = tpix[yb * tex->w + xn];
+                const uint32_t c01 = tpix[yn * tex->w + xb];
+                const uint32_t c11 = tpix[yn * tex->w + xn];
+                uint32_t out = 0xFF000000u;
+                for (uint32_t ch = 0; ch < 3; ++ch) {
+                    const uint32_t sh = ch * 8;
+                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
+                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
+                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
+                }
+                tc = out;
+            } else {
+                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                const int ia = 255 - ff;
+                const int tr = ((tc & 0xFF) * rr + 127) >> 8;
+                const int tg = (((tc >> 8) & 0xFF) * gg + 127) >> 8;
+                const int tb = (((tc >> 16) & 0xFF) * bb + 127) >> 8;
+                opt_put(dst,
+                    (ia * tr + ff * fcr + 127) >> 8,
+                    (ia * tg + ff * fcg + 127) >> 8,
+                    (ia * tb + ff * fcb + 127) >> 8);
+                if (z_write) *zb = (uint16_t)zz;
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv; ff += df;
+            rr += dr; gg += dg; bb += db;
+            zz += dz;
+        }
+        for (int i = 2; i < 10; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- parameterized triangle walker: same setup math as R_RASTERIZE,
+ *     but calls a fused scanline function (no per-pixel indirect calls) --- */
+#define R_RASTERIZE_TRI_SEG_FAST(y_a, y_b, NP, FN) \
+    register int y = y_a; \
+    register int y_end = y_b; \
+    register int x, x_end; \
+    register int idx; \
+    register float dx; \
+    while (y < y_end) { \
+        x = imax(r_clip.x0, x_a); \
+        x_end = imin(r_clip.x1, x_b); \
+        dx = 1.f - (x_a - x); \
+        for (i = 2; i < NP; ++i) p[i] = p_a[i] + dx * dp[i].x; \
+        idx = scr_width * (scr_height - y - 1) + x; \
+        if (x_end > x) \
+            FN(gfx_output + idx, z_buffer + idx, x_end - x, p, dp, cur_tex[0]); \
+        x_a += dxdy_a; \
+        x_b += dxdy_b; \
+        for (i = 2; i < NP; ++i) p_a[i] += dpdy_a[i]; \
+        ++y; \
+    }
+
+#define R_RASTERIZE_FAST(tri, NP, FN) \
+    const float *v0 = (float *)tri.v0; \
+    const float *v1 = (float *)tri.v1; \
+    const float *v2 = (float *)tri.v2; \
+    const int y0i = imax(r_clip.y0, (int)v0[1]); \
+    const int y1i = imax(y0i, (int)v1[1]); \
+    const int y2i = imin(r_clip.y1, (int)v2[1]); \
+    if ((y0i == y1i && y0i == y2i) || ((int)v0[0] == (int)v1[0] && (int)v0[0] == (int)v2[0])) \
+        return; \
+    const Vector4 ab = (Vector4) {{ v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2], v1[3] - v0[3] }}; \
+    const Vector4 ac = (Vector4) {{ v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2], v2[3] - v0[3] }}; \
+    const Vector2 bc = (Vector2) {{ v2[0] - v1[0], v2[1] - v1[1] }}; \
+    const float denom = 1.f / (ac.x * ab.y - ab.x * ac.y); \
+    const float dxdy_ab = ab.x / ab.y; \
+    const float dxdy_ac = ac.x / ac.y; \
+    const float dxdy_bc = bc.x / bc.y; \
+    const bool side = dxdy_ac > dxdy_ab; \
+    const float y_pre0 = 1.f - (v0[1] - y0i); \
+    float dpdy_a[NP]; \
+    float p_a[NP]; \
+    float p[NP]; \
+    Vector2 dp[NP]; \
+    register int i; \
+    for (i = 2; i < NP; ++i) { \
+        dp[i].x = ((v2[i] - v0[i]) * ab.y - (v1[i] - v0[i]) * ac.y) * denom; \
+        dp[i].y = ((v1[i] - v0[i]) * ac.x - (v2[i] - v0[i]) * ab.x) * denom; \
+    } \
+    if (!side) { \
+        const float dxdy_a = dxdy_ac; \
+        float x_a = v0[0] + y_pre0 * dxdy_a; \
+        for (i = 2; i < NP; ++i) { \
+            dpdy_a[i] = dxdy_ac * dp[i].x + dp[i].y; \
+            p_a[i] = v0[i] + y_pre0 * dpdy_a[i]; \
+        } \
+        if (y0i < y1i) { \
+            const float dxdy_b = dxdy_ab; \
+            float x_b = v0[0] + y_pre0 * dxdy_ab; \
+            R_RASTERIZE_TRI_SEG_FAST(y0i, y1i, NP, FN); \
+        } \
+        if (y1i < y2i) { \
+            const float dxdy_b = dxdy_bc; \
+            const float y_pre1 = 1.f - (v1[1] - y1i); \
+            float x_b = v1[0] + y_pre1 * dxdy_bc; \
+            R_RASTERIZE_TRI_SEG_FAST(y1i, y2i, NP, FN); \
+        } \
+    } else { \
+        const float dxdy_b = dxdy_ac; \
+        float x_b = v0[0] + y_pre0 * dxdy_ac; \
+        if (y0i < y1i) { \
+            const float dxdy_a = dxdy_ab; \
+            float x_a = v0[0] + y_pre0 * dxdy_a; \
+            for (i = 2; i < NP; ++i) { \
+                dpdy_a[i] = dxdy_ab * dp[i].x + dp[i].y; \
+                p_a[i] = v0[i] + y_pre0 * dpdy_a[i]; \
+            } \
+            R_RASTERIZE_TRI_SEG_FAST(y0i, y1i, NP, FN); \
+        } \
+        if (y1i < y2i) { \
+            const float y_pre1 = 1.f - (v1[1] - y1i); \
+            const float dxdy_a = dxdy_bc; \
+            float x_a = v1[0] + y_pre1 * dxdy_a; \
+            for (i = 2; i < NP; ++i) { \
+                dpdy_a[i] = dxdy_bc * dp[i].x + dp[i].y; \
+                p_a[i] = v1[i] + y_pre1 * dpdy_a[i]; \
+            } \
+            R_RASTERIZE_TRI_SEG_FAST(y1i, y2i, NP, FN); \
+        } \
+    }
+
+static void rast_fn_fast_tex_rgb(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 9, opt_scan_tex_rgb);
+}
+static void rast_fn_fast_tex_rgba(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 10, opt_scan_tex_rgba);
+}
+static void rast_fn_fast_rgba(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 8, opt_scan_rgba);
+}
+static void rast_fn_fast_rgb(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 7, opt_scan_rgb);
+}
+static void rast_fn_fast_tex_fog(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 7, opt_scan_tex_fog);
+}
+static void rast_fn_fast_fog_rgb(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 8, opt_scan_fog_rgb);
+}
+static void rast_fn_fast_tex_fog_rgb(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 10, opt_scan_tex_fog_rgb);
+}
+
 static inline void pop_triangle(const float *buf, const int stride) {
     Vector4 *v0 = (Vector4 *)buf;
     Vector4 *v1 = (Vector4 *)(buf + stride);
@@ -680,7 +1435,7 @@ static inline void depth_clear(void) {
 }
 
 static inline void color_clear(void) {
-    memset(gfx_output, 0x00, scr_size << 2);
+    memset(gfx_output, 0x00, scr_size * sizeof(*gfx_output));
 }
 
 /* FIXME: ztrick fucks with sky blending
@@ -738,6 +1493,8 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
     prg->shader_id = shader_id;
     prg->cc = ccf;
 
+    const uint32_t base_id = ccf.opt_fog ? (shader_id & ~(uint32_t)SHADER_OPT_FOG) : shader_id;
+
     int num_props = 0;
 
     if (ccf.opt_fog) num_props++; // software renderer only gets fog intensity
@@ -752,19 +1509,21 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
         prg->mix = SH_MT_TEXTURE_COLOR;
         if (ccf.num_inputs > 1)
             prg->combine = combine_tex_rgb_rgb; // only one such known shader
-        else if (shader_id == 0x0000038D || shader_id == 0x01200A00 || shader_id == 0x01045A00 || shader_id == 0x0120038D)
+        else if (base_id == 0x0000038D || base_id == 0x01200A00 || base_id == 0x01045A00 || base_id == 0x0120038D)
             if (ccf.opt_alpha) {
                 bool alpha_uses_texel = false;
                 for (int k = 0; k < 4; k++)
                     if (ccf.c[1][k] == SHADER_TEXEL0 || ccf.c[1][k] == SHADER_TEXEL0A)
                         alpha_uses_texel = true;
-                prg->combine = alpha_uses_texel ? combine_tex_rgba_decal_texa : combine_tex_rgba_decal;
+                prg->combine = ccf.opt_fog
+                    ? (alpha_uses_texel ? combine_tex_fog_rgba_decal_texa : combine_tex_fog_rgba_decal)
+                    : (alpha_uses_texel ? combine_tex_rgba_decal_texa : combine_tex_rgba_decal);
             } else
-                prg->combine = combine_tex_rgb_decal;
+                prg->combine = ccf.opt_fog ? combine_tex_fog_rgb_decal : combine_tex_rgb_decal;
         else if (ccf.opt_fog)
             prg->combine = ccf.opt_alpha ? combine_tex_fog_rgba : combine_tex_fog_rgb;
         else if (ccf.opt_alpha)
-            prg->combine = shader_id == 0x01A00045 ? combine_tex_rgba_texa : combine_tex_rgba;
+            prg->combine = base_id == 0x01A00045 ? combine_tex_rgba_texa : combine_tex_rgba;
         else
             prg->combine = combine_tex_rgb;
     } else if (ccf.used_textures[0]) {
@@ -794,6 +1553,21 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
     // pick rasterizer that interps the amount of float properties this shader requires
     prg->rast = rast_funcs[num_props];
 
+    if (num_props == 5 && prg->combine == combine_tex_rgb)
+        prg->rast = rast_fn_fast_tex_rgb;
+    else if (num_props == 6 && prg->combine == combine_tex_rgba)
+        prg->rast = rast_fn_fast_tex_rgba;
+    else if (num_props == 4 && prg->combine == combine_rgba)
+        prg->rast = rast_fn_fast_rgba;
+    else if (num_props == 3 && prg->combine == combine_rgb)
+        prg->rast = rast_fn_fast_rgb;
+    else if (num_props == 6 && prg->combine == combine_tex_fog_rgb)
+        prg->rast = rast_fn_fast_tex_fog_rgb;
+    else if (num_props == 4 && prg->combine == combine_fog_rgb)
+        prg->rast = rast_fn_fast_fog_rgb;
+    else if (num_props == 3 && prg->combine == combine_tex_fog)
+        prg->rast = rast_fn_fast_tex_fog;
+
     gfx_soft_load_shader(prg);
 
     return prg;
@@ -821,6 +1595,8 @@ static uint32_t gfx_soft_new_texture(void) {
     }
 
     tex_hdr[id].sample = tex_sample_nearest_rr;
+    tex_hdr[id].wrap_mode_x = WRAP_REPEAT;
+    tex_hdr[id].wrap_mode_y = WRAP_REPEAT;
 
     return id;
 }
@@ -886,6 +1662,10 @@ static void gfx_soft_set_sampler_parameters(int tile, bool linear_filter, uint32
 
     cur_tex[tile]->filter = linear_filter;
     cur_tex[tile]->sample = samplers[cms | cmt];
+    // OPTIMIZATION: resolve wrap mode per axis once so the fast path
+    // can wrap with 2 integer ops instead of an indirect call
+    cur_tex[tile]->wrap_mode_x = (uint8_t)(cms >> 2);
+    cur_tex[tile]->wrap_mode_y = (uint8_t)cmt;
 }
 
 static void gfx_soft_set_depth_test(bool depth_test) {
@@ -955,6 +1735,7 @@ static void gfx_soft_fill_rect(int x0, int y0, int x1, int y1, const uint8_t *rg
     y0 = imax(0, y0);
     x1 = imin(scr_width, x1);
     y1 = imin(scr_height, y1);
+#ifndef CONVERT
     register const uint32_t color = *(uint32_t *)rgba;
     register uint32_t *base = gfx_output + y0 * scr_width + x0;
     register uint32_t *p;
@@ -964,6 +1745,18 @@ static void gfx_soft_fill_rect(int x0, int y0, int x1, int y1, const uint8_t *rg
         for (x = x0; x < x1; ++x, ++p)
             *p = color;
     }
+#else
+    // RGB565: pack r,g,b from the fill color (rgba[0..2] = r,g,b)
+    register const uint16_t color = opt_pack565(rgba[0], rgba[1], rgba[2]);
+    register uint16_t *base = gfx_output + y0 * scr_width + x0;
+    register uint16_t *p;
+    register int x, y;
+    for (y = y0; y < y1; ++y, base += scr_width) {
+        p = base;
+        for (x = x0; x < x1; ++x, ++p)
+            *p = color;
+    }
+#endif
 }
 
 static inline void gfx_soft_tex_rect_replace(int x0, int y0, int x1, int y1, const float u0, const float v0, const float dudx, const float dvdy) {
@@ -1007,16 +1800,8 @@ static void gfx_soft_tex_rect(int x0, int y0, int x1, int y1, const float u0, co
 }
 
 static void gfx_soft_prepare_tables(void) {
-    for (int t = 0; t < 0x100; ++t) {
-        for (int i = 0, sum = 0; i < 0x100; ++i, sum += t) {
-            lerp_tab[t][0xFF - i] = (uint8_t)(-sum >> 8);
-            lerp_tab[t][0xFF + i] = (uint8_t)( sum >> 8);
-        }
-    }
-
-    for (int x = 0; x < 0x100; ++x)
-        for (int y = 0; y < 0x100; ++y)
-            mult_tab[x][y] = (x * y) >> 8;
+    // OPTIMIZATION: tables removed (they polluted L1 caches).
+    // Kept as a no-op to preserve the init call sequence.
 }
 
 static void gfx_soft_set_resolution(const int width, const int height) {

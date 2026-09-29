@@ -336,7 +336,28 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
 
 	SDL_ShowCursor(0);
   #ifdef CONVERT
-  	 sdl_screen = SDL_SetVideoMode(window_width, window_height, 16, SDL_HWSURFACE | SDL_TRIPLEBUF);
+    texture = SDL_SetVideoMode(window_width, window_height, 16, SDL_HWSURFACE | SDL_TRIPLEBUF);
+    if (!texture) {
+      printf("SDL: 16bpp HWSURFACE failed (%s), falling back to SWSURFACE\n", SDL_GetError());
+      texture = SDL_SetVideoMode(window_width, window_height, 16, SDL_SWSURFACE | SDL_DOUBLEBUF);
+      if (!texture) {
+        printf("SDL: cannot set any 16bpp video mode: %s\n", SDL_GetError());
+        game_exit();
+      }
+    }
+
+    int dividend = (1 << (SUB_RES_DIVIDER-1));
+    for(int i=0; i < NB_SUBRESOLUTIONS; i++){
+      int factor = dividend-i;
+      resolutions[i].w = window_width*factor/dividend;
+      resolutions[i].h = window_height*factor/dividend;
+      sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 16, 0,0,0,0);
+    }
+
+    current_res_idx = 0;
+    sdl_screen = sdl_screen_subRes[current_res_idx];
+
+    init_menu_SDL();
   #else
     #ifdef DIRECT_SDL
     	sdl_screen = SDL_SetVideoMode(window_width, window_height, 32, SDL_HWSURFACE | SDL_TRIPLEBUF);
@@ -357,7 +378,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       current_res_idx = 0;
       sdl_screen = sdl_screen_subRes[current_res_idx];
 
-      //init_menu_SDL();
+      init_menu_SDL();
     #endif
   #endif
 	#ifdef SDL_SURFACE
@@ -491,11 +512,11 @@ static void gfx_sdl_handle_events(void) {
 
                   case SDLK_q:
                   case SDLK_HOME:
-                  game_exit();
-                  //run_menu_loop();
-                  //clear_screen(texture);
-                  //last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
-                  //last = tick; // same
+                  //game_exit();
+                  run_menu_loop();
+                  clear_screen(texture);
+                  last_time = SDL_GetTicks(); // otherwise frameskip will kickoff
+                  last = tick; // same
                   break;
 
                   // case SDLK_h:
@@ -647,12 +668,54 @@ static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Rect
 
 static SDL_Rect middle_rect = {0,0,320,240};
 
+static void flip_NNOptimized_AllowOutOfScreen16(SDL_Surface *src_surface, SDL_Rect *src_rect, SDL_Surface *dst_surface, int new_w, int new_h) {
+  int w1 = src_rect->w;
+  int h1 = src_rect->h;
+  int w2 = new_w;
+  int h2 = new_h;
+  int x_ratio = (int) ((w1 << 16) / w2);
+  int y_ratio = (int) ((h1 << 16) / h2);
+  int x2, y2;
+
+  int y_padding = (RES_HW_SCREEN_VERTICAL - new_h) / 2;
+  int x_padding = 0;
+  if (w2 > RES_HW_SCREEN_HORIZONTAL) {
+    x_padding = (w2 - RES_HW_SCREEN_HORIZONTAL) / 2 + 1;
+  }
+  int x_padding_ratio = x_padding * w1 / w2;
+
+  uint16_t *src_row = (uint16_t*)(src_surface->pixels) + src_surface->w * src_rect->y + src_rect->x;
+
+  for (int i = 0; i < h2; i++) {
+    if (i >= RES_HW_SCREEN_VERTICAL) {
+      continue;
+    }
+
+    uint16_t *t = ((uint16_t *)dst_surface->pixels) + ((i + y_padding) * ((w2 > RES_HW_SCREEN_HORIZONTAL) ? RES_HW_SCREEN_HORIZONTAL : w2));
+    y2 = (i * y_ratio) >> 16;
+    uint16_t *p = (uint16_t*)(src_row) + (y2*src_surface->w + x_padding_ratio);
+    int rat = 0;
+    for (int j = 0; j < w2; j++) {
+      if (j >= RES_HW_SCREEN_HORIZONTAL) {
+        continue;
+      }
+      x2 = rat >> 16;
+      *t++ = p[x2];
+      rat += x_ratio;
+    }
+  }
+}
+
 void gfx_sdl_upscale_to_fullscreen(void) {
   if (current_res_idx==0) {
     return;
   }
   else{
+#ifdef CONVERT
+    flip_NNOptimized_AllowOutOfScreen16(sdl_screen, &resolutions[current_res_idx], sdl_screen_subRes[0], configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+#else
     flip_NNOptimized_AllowOutOfScreen(sdl_screen, &resolutions[current_res_idx], sdl_screen_subRes[0], configScreenWidth*RES_HW_SCREEN_VERTICAL/configScreenHeight, RES_HW_SCREEN_VERTICAL);
+#endif
   }
   apply_subRes(0);
   on_fullscreen_changed_callback(true);

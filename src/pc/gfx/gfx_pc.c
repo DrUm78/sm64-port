@@ -980,7 +980,12 @@ static inline struct RGBA rgba_lerp(const struct RGBA c0, const struct RGBA c1, 
         c0.r + (c1.r - c0.r) * t,
         c0.g + (c1.g - c0.g) * t,
         c0.b + (c1.b - c0.b) * t,
-        c0.a + (c0.a - c0.a) * t,
+        // FIX: was (c0.a - c0.a), i.e. always 0. The alpha channel
+        // carries the per-vertex fog factor (set in gfx_sp_vertex), so
+        // any triangle clipped by GFX_MANUAL_CLIPPING kept the fog factor
+        // of its first vertex -> fog "jumping" on partially clipped
+        // triangles (appearing/disappearing layers within a scene).
+        c0.a + (c1.a - c0.a) * t,
     };
 }
 
