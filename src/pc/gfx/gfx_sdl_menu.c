@@ -14,6 +14,7 @@
 
 extern bool configFiltering;
 extern bool configEnableFog;
+extern bool configDrawSky;
 
 /// -------------- DEFINES --------------
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -330,6 +331,14 @@ void add_menu_zone(ENUM_MENU_TYPE menu_type){
         text_pos.y = surface->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 - padding_y_from_center_menu_zone*2;
         SDL_BlitSurface(text_surface, NULL, surface, &text_pos);
         break;
+    case MENU_TYPE_SKYBOX:
+        MENU_DEBUG_PRINTF("Init MENU_TYPE_SKYBOX\n");
+        /// ------ Text ------
+        text_surface = TTF_RenderText_Blended(menu_title_font, "SKYBOX", text_color);
+        text_pos.x = (surface->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
+        text_pos.y = surface->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 - padding_y_from_center_menu_zone*2;
+        SDL_BlitSurface(text_surface, NULL, surface, &text_pos);
+        break;
     case MENU_TYPE_EXIT:
         MENU_DEBUG_PRINTF("Init MENU_TYPE_EXIT\n");
         /// ------ Text ------
@@ -373,6 +382,9 @@ void init_menu_zones(){
 
     /// Init Fog Menu
     add_menu_zone(MENU_TYPE_FOG);
+
+    /// Init Skybox Menu
+    add_menu_zone(MENU_TYPE_SKYBOX);
 
     /// Init Aspect Ratio Menu
     //add_menu_zone(MENU_TYPE_ASPECT_RATIO);
@@ -604,6 +616,15 @@ void menu_screen_refresh(int menuItem, int prevItem, int scroll, uint8_t menu_co
             SDL_BlitSurface(text_surface, NULL, draw_screen, &text_pos);
             break;
 
+        case MENU_TYPE_SKYBOX:
+            /// ---- Write current state ----
+            sprintf(text_tmp, "<   %s   >", configDrawSky ? "ENABLED" : "DISABLED");
+            text_surface = TTF_RenderText_Blended(menu_info_font, text_tmp, text_color);
+            text_pos.x = (draw_screen->w - MENU_ZONE_WIDTH)/2 + (MENU_ZONE_WIDTH - text_surface->w)/2;
+            text_pos.y = draw_screen->h - MENU_ZONE_HEIGHT/2 - text_surface->h/2 + padding_y_from_center_menu_zone;
+            SDL_BlitSurface(text_surface, NULL, draw_screen, &text_pos);
+            break;
+
         case MENU_TYPE_EXIT:
         case MENU_TYPE_POWERDOWN:
             if(menu_confirmation){
@@ -812,6 +833,13 @@ void run_menu_loop()
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }
+                        else if(idx_menus[menuItem] == MENU_TYPE_SKYBOX){
+                            MENU_DEBUG_PRINTF("Skybox DOWN\n");
+                            /// ----- Toggle and persist -----
+                            configDrawSky = !configDrawSky;
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
                         // else if(idx_menus[menuItem] == MENU_TYPE_ASPECT_RATIO){
                         //     MENU_DEBUG_PRINTF("Aspect Ratio DOWN\n");
                         //     aspect_ratio = (!aspect_ratio)?(NB_ASPECT_RATIOS_TYPES-1):(aspect_ratio-1);
@@ -888,6 +916,13 @@ void run_menu_loop()
                             MENU_DEBUG_PRINTF("Fog UP\n");
                             /// ----- Toggle and persist -----
                             configEnableFog = !configEnableFog;
+                            /// ------ Refresh screen ------
+                            screen_refresh = 1;
+                        }
+                        else if(idx_menus[menuItem] == MENU_TYPE_SKYBOX){
+                            MENU_DEBUG_PRINTF("Skybox UP\n");
+                            /// ----- Toggle and persist -----
+                            configDrawSky = !configDrawSky;
                             /// ------ Refresh screen ------
                             screen_refresh = 1;
                         }

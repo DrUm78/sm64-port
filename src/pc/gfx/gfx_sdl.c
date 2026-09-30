@@ -542,10 +542,12 @@ static void gfx_sdl_handle_events(void) {
 
                   // testing output of dynamics resolutions on desktop
                   case SDLK_F11:
+                  case SDLK_v:
                     set_lowerRes(dichotomic_res_change, true);
                   break;
 
                   case SDLK_F12:
+                  case SDLK_o:
                     set_higherRes(dichotomic_res_change, true);
                   break;
 #endif
