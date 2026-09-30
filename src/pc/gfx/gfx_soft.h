@@ -6,15 +6,9 @@
 // For some strange reasons, trying to use SDL to convert the surface
 // on the Funkey results in a bus error and crash...
 
-#if defined(RS97) || defined(FUNKEY)
 //#define CONVERT
 //#define DIRECT_SDL
 #define SDL_SURFACE
-#else
-//#define CONVERT
-//#define DIRECT_SDL
-#define SDL_SURFACE
-#endif
 
 extern struct GfxRenderingAPI gfx_soft_api;
 
