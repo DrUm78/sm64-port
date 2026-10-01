@@ -163,6 +163,10 @@ static int scr_width SAVESTATE_EXCLUDE;
 static int scr_height SAVESTATE_EXCLUDE;
 static int scr_size SAVESTATE_EXCLUDE; // scr_width * scr_height
 
+// OPTIMIZATION (armv7/mips32r2): lerp_tab (131 KiB) and mult_tab (64 KiB)
+// were larger than L1 caches (16-32 KiB): every lookup was a near-certain
+// L1 miss. Replaced by pure integer arithmetic (3-4 mla/madd instructions).
+// dither kernel for unreal texture filtering
 static const Vector2 dither_tab[2][2] = {
     { {{ 0.25f, 0.00f }}, {{ 0.50f, 0.75f }} },
     { {{ 0.75f, 0.50f }}, {{ 0.00f, 0.25f }} },
@@ -310,6 +314,19 @@ static inline Color4 tex_sample_nearest(const struct Texture * const tex, const 
     return tex->sample(tex, x, y);
 }
 
+/* =====================================================================
+ * OPTIMIZATION + texture smoothing: low-cost integer bilinear filter.
+ * FIX v3: gfx_pc.c ALREADY adds the +0.5-texel center offset to u,v when
+ * linear filtering is active (N64 convention). Therefore the sample
+ * point is exactly (u * fw) with NO extra -0.5 subtraction.
+ * Fixes kept:
+ *  - proper floor() instead of truncation (u*fw < 0 happens in repeat)
+ *  - all taps (base and neighbors) go through tex->sample, so the true
+ *    wrap mode applies: REPEAT tiles seamlessly, CLAMP/MIRROR blend
+ *    with the edge texel, exactly like the N64 hardware.
+ * Only used when the game requests linear filtering (configFiltering),
+ * otherwise falls back to nearest at no extra cost.
+ * ==================================================================== */
 static inline Color4 tex_sample_bilinear_f(const struct Texture * const tex, const float u, const float v) {
     const float xf = u * tex->fw;
     const float yf = v * tex->fh;
@@ -364,6 +381,9 @@ static Color4 combine_fog_rgb(const float z, const float *props) {
 static Color4 combine_fog_rgba(const float z, const float *props) {
     const uint8_t fog = props[0] * z;
     const Color4 c = (Color4) {{ .r = props[1] * z, .g = props[2] * z, .b = props[3] * z, .a = props[4] * z }};
+    // FIX(v9.2): fog only applies to RGB. Blending alpha toward
+    // fog_color.a (0xFF) made transparent texels/vertices pass the
+    // edge test in heavy fog (opaque gray squares on fences etc).
     const Color4 out = rgba_blend(fog_color, c, fog);
     return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = c.a }};
 }
@@ -381,6 +401,9 @@ static Color4 combine_tex(const float z, const float *props) {
 static Color4 combine_tex_fog(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const uint8_t fog = props[2] * z;
+    // FIX(v9.2): keep the texel alpha: this combiner also serves
+    // texture-edge shaders (SH_MT_TEXTURE has no alpha split), and a
+    // fog-blended alpha let transparent texels pass the edge test.
     const Color4 out = rgba_blend(fog_color, tc, fog);
     return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = tc.a }};
 }
@@ -420,6 +443,7 @@ static Color4 combine_tex_fog_rgba(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const uint8_t fog = props[2] * z;
     const Color4 cc = (Color4) {{ .r = props[3] * z, .g = props[4] * z, .b = props[5] * z, .a = props[6] * z }};
+    // FIX(v9.2): fog only applies to RGB (see combine_fog_rgba)
     const Color4 mod = rgba_modulate(tc, cc);
     const Color4 out = rgba_blend(fog_color, mod, fog);
     return (Color4) {{ .r = out.r, .g = out.g, .b = out.b, .a = mod.a }};
@@ -439,6 +463,17 @@ static Color4 combine_tex_rgba_decal_texa(const float z, const float *props) {
     return out;
 }
 
+/* FIX(v9.3): fog variants of the decal combiners. Enabling fog sets
+ * SHADER_OPT_FOG in the shader id, so the hardcoded decal ids used to
+ * stop matching when fog was on: decal geometry (fences...) fell through
+ * to combine_tex_fog_rgba, which MODULATES the texel by the (grayish)
+ * vertex color instead of using the texel directly -> solid gray
+ * fences whenever fog was enabled. The decal ids are now compared
+ * with the runtime-toggled option bits (fog/noise) masked off, and
+ * these variants keep decal semantics with fog applied to RGB only
+ * (never alpha, see FIX(v9.2)).
+ * Layout (fog adds one prop right after u,v): [0]=u [1]=v [2]=fog
+ * then colors. */
 static Color4 combine_tex_fog_rgb_decal(const float z, const float *props) {
     const Color4 tc = tex_sample(cur_tex[0], props[0] * z, props[1] * z);
     const uint8_t fog = props[2] * z;
@@ -489,8 +524,7 @@ static Color4 combine_tex_tex_rgba(const float z, const float *props) {
 #ifdef CONVERT
 // R G B A
 // R G B
-static inline uint16_t Color32Reverse(uint32_t x)
-{
+static inline uint16_t Color32Reverse(uint32_t x){
     uint8_t red   = ((x >> 0)  & 0xFF);
     uint8_t green = ((x >> 8)  & 0xFF);
     uint8_t blue  = ((x >> 16)  & 0xFF);
@@ -536,6 +570,11 @@ static void draw_pixel_zwrite(const int idx, const uint16_t z, Color4 src) {
     z_buffer[idx] = z;
 }
 
+// FIX(v8): read the framebuffer destination for blending. The old code
+// passed the raw pixel to Color32Reverse(), which under CONVERT
+// interprets the 16bpp RGB565 value as 32bpp (a<<24|b<<16|g<<8|r):
+// every blended pixel on the generic path (shadows, fades, fog
+// geometry, text antialiasing) read scrambled r/g/b channels.
 static inline Color4 gfx_read_dst(const int idx) {
 #ifdef CONVERT
     const uint16_t d = gfx_output[idx];
@@ -730,6 +769,24 @@ DEFINE_RAST_FUNC(12)
 DEFINE_RAST_FUNC(13)
 DEFINE_RAST_FUNC(14)
 
+/* =====================================================================
+ * OPTIMIZATION: fused fast-path scanlines for the 4 dominant shaders:
+ *   combine_tex_rgb  (opaque textured)          nprops 7? no: 9 (u,v,rgb)
+ *   combine_tex_rgba (textured + alpha blending) nprops 10 (u,v,r,g,b,a)
+ *   combine_rgba     (vertex color + alpha)      nprops 8 (r,g,b,a)
+ *   combine_rgb      (vertex color, opaque)      nprops 7 (r,g,b)
+ * For these paths only:
+ *   - 1 float division per pixel   -> 1 division per OPT_STEP pixels
+ *   - 2 indirect calls per pixel   -> 0 (combiner and plotter inlined)
+ *   - float interpolation per pixel -> 16.16 / 8.8 integer stepping
+ * Blend / texture-edge / z-write are resolved from cur_shader->draw_flags
+ * and the z_test / z_write globals (same semantics as draw_pixel_*).
+ * Bilinear (v3): sample point is (u*fw) directly (gfx_pc.c already adds
+ * the N64 +0.5-texel center offset); all taps use the true wrap mode.
+ * CONVERT (RGB565) builds use the same paths via opt_pix_t / opt_put /
+ * opt_get: framebuffer bandwidth is halved with the same fast paths.
+ * ==================================================================== */
+
 #ifndef CONVERT
 typedef uint32_t opt_pix_t;
 #else
@@ -744,6 +801,9 @@ static inline uint16_t opt_pack565(const int r, const int g, const int b) {
     return (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
 }
 static inline void opt_unpack565(const uint16_t d, int *r, int *g, int *b) {
+    // FIX(v8): replicate high bits for full 0-255 range (the old plain
+    // shifts mapped white to (248,252,248) -> greenish tint accumulating
+    // over successive blends: visible on shadows and fades)
     const int r5 = (d >> 11) & 0x1F, g6 = (d >> 5) & 0x3F, b5 = d & 0x1F;
     *r = (r5 << 3) | (r5 >> 2);
     *g = (g6 << 2) | (g6 >> 4);
@@ -753,6 +813,11 @@ static inline void opt_unpack565(const uint16_t d, int *r, int *g, int *b) {
 // pixel write/read valid in both 32bpp and CONVERT (RGB565) builds
 static inline void opt_put(opt_pix_t *dst, const int r, const int g, const int b) {
 #ifndef CONVERT
+    // FIX(v9.1): must match Color32Reverse() = bswap32(x) >> 8 | 0xFF000000,
+    // which puts BLUE in the low byte and RED in bits 16-23 of the 32bpp
+    // framebuffer. The previous (b << 16 | r) layout swapped R and B on
+    // every fast-path pixel (bug was hidden while the routing constants
+    // were wrong and the fast paths never ran).
     *dst = 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 #else
     *dst = opt_pack565(r, g, b);
@@ -760,6 +825,7 @@ static inline void opt_put(opt_pix_t *dst, const int r, const int g, const int b
 }
 static inline void opt_get(const opt_pix_t *src, int *r, int *g, int *b) {
 #ifndef CONVERT
+    // FIX(v9.1): inverse of opt_put (was swapped like opt_put)
     *r = (*src >> 16) & 0xFF;
     *g = (*src >> 8) & 0xFF;
     *b = *src & 0xFF;
@@ -863,6 +929,11 @@ static void opt_scan_tex_rgba(opt_pix_t *dst, uint16_t *zb, int n,
     const int tw = tex->wrap_w, th = tex->wrap_h;
     const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
     const bool bil = tex->filter;
+    // draw mode resolved once per scanline (matches draw_pixel_* family).
+    // FIX(v9.2): texture-edge shaders carry DRAW_BLEND_EDGE *without*
+    // DRAW_BLEND (see create_and_load_new_shader), so testing DRAW_BLEND
+    // alone made every edge-mode pixel take the opaque-write branch:
+    // coins / shadows / bubbles were drawn as solid squares.
     const uint32_t dfl = cur_shader->draw_flags;
     const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
     const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
@@ -900,54 +971,81 @@ static void opt_scan_tex_rgba(opt_pix_t *dst, uint16_t *zb, int n,
         const int dz = (zz1 - zz) / cnt;
 
         for (int k = cnt; k; --k) {
-            uint32_t tc;
+            /* OPTIMIZATION (v11): alpha-first early-out for blend/edge
+             * shaders (masks, overlays cover the whole screen but are
+             * mostly transparent). Compute the alpha channel first
+             * (1-channel bilinear), reject transparent pixels, and only
+             * pay the 3-channel bilinear + modulate + dst blend for
+             * pixels that are actually written. Same visible result:
+             * blend with sa==0 writes dst back unchanged, edge below
+             * threshold writes nothing (original draw_pixel_* behavior).
+             */
+            uint32_t c00, c10, c01, c11;
+            int fx, fy;
+            int ta;
             if (bil) {
                 const int x0 = uu >> 16, y0 = vv >> 16;
-                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                fx = (uu >> 8) & 0xFF; fy = (vv >> 8) & 0xFF;
                 const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
                 const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
-                const uint32_t c00 = tpix[yb * tex->w + xb];
-                const uint32_t c10 = tpix[yb * tex->w + xn];
-                const uint32_t c01 = tpix[yn * tex->w + xb];
-                const uint32_t c11 = tpix[yn * tex->w + xn];
-                uint32_t out = 0;
-                for (uint32_t ch = 0; ch < 4; ++ch) {
-                    const uint32_t sh = ch * 8;
-                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
-                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
-                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
-                }
-                tc = out;
+                c00 = tpix[yb * tex->w + xb];
+                c10 = tpix[yb * tex->w + xn];
+                c01 = tpix[yn * tex->w + xb];
+                c11 = tpix[yn * tex->w + xn];
+                const int t = (int)((c00 >> 24) & 0xFF) * (256 - fx) + (int)((c10 >> 24) & 0xFF) * fx;
+                const int b = (int)((c01 >> 24) & 0xFF) * (256 - fx) + (int)((c11 >> 24) & 0xFF) * fx;
+                ta = (((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) * aa + 127) >> 8;
             } else {
-                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                fx = 0; fy = 0;
+                c00 = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                c10 = c01 = c11 = c00;
+                ta = ((int)((c00 >> 24) & 0xFF) * aa + 127) >> 8;
             }
             if (!z_test || (uint16_t)zz <= *zb) {
-                // modulate texel by vertex rgba (integer, no tables)
-                const int sr = ((tc & 0xFF) * rr + 127) >> 8;
-                const int sg = (((tc >> 8) & 0xFF) * gg + 127) >> 8;
-                const int sb = (((tc >> 16) & 0xFF) * bb + 127) >> 8;
-                const int sa = (((tc >> 24) & 0xFF) * aa + 127) >> 8;
-                if (!do_blend) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else if (!do_blend) {
                     // opaque write (draw_pixel / draw_pixel_zwrite)
-                    opt_put(dst, sr, sg, sb);
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    opt_put(dst, (tr * rr + 127) >> 8, (tg * gg + 127) >> 8, (tb * bb + 127) >> 8);
                     if (z_write) *zb = (uint16_t)zz;
-                } else if (!do_edge || sa > 0x80) {
-                    // full blend, or edge blend above threshold
-                    if (sa >= 255) {
+                } else if (ta == 0) {
+                    // blend with 0 alpha: the color write is a no-op,
+                    // keep only the z write of draw_pixel_blend_zwrite
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    const int sr = (tr * rr + 127) >> 8;
+                    const int sg = (tg * gg + 127) >> 8;
+                    const int sb = (tb * bb + 127) >> 8;
+                    if (ta >= 255) {
                         opt_put(dst, sr, sg, sb);
-                    } else if (sa > 0) {
+                    } else {
                         int dr_, dg_, db_;
                         opt_get(dst, &dr_, &dg_, &db_);
-                        const int ia = 255 - sa;
-                        const int orr = (sr * sa + dr_ * ia + 127) >> 8;
-                        const int og = (sg * sa + dg_ * ia + 127) >> 8;
-                        const int ob = (sb * sa + db_ * ia + 127) >> 8;
+                        const int ia = 255 - ta;
+                        const int orr = (sr * ta + dr_ * ia + 127) >> 8;
+                        const int og = (sg * ta + dg_ * ia + 127) >> 8;
+                        const int ob = (sb * ta + db_ * ia + 127) >> 8;
                         opt_put(dst, orr, og, ob);
                     }
                     if (z_write) *zb = (uint16_t)zz;
-                } else if (z_write) {
-                    // edge mode below threshold: original draw_pixel_blend_edge
-                    // skips BOTH color and z writes
                 }
             }
             ++dst; ++zb;
@@ -965,6 +1063,7 @@ static void opt_scan_rgba(opt_pix_t *dst, uint16_t *zb, int n,
         float *p, const Vector2 *dp, UNUSED const struct Texture * const tex) {
     const int zoff = (int)z_offset;
     const uint32_t dfl = cur_shader->draw_flags;
+    // FIX(v9.2): include DRAW_BLEND_EDGE (see opt_scan_tex_rgba)
     const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
     const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
 
@@ -1064,6 +1163,18 @@ static void opt_scan_rgba(opt_pix_t *dst, uint16_t *zb, int n,
     }
 }
 
+/* =====================================================================
+ * OPTIMIZATION (v9): fused fog fast paths. Layout (GFX_W_PREMULT, props
+ * are stored divided by w, multiplied back by w0 = 1/p[3] here):
+ *   combine_fog_rgb      (nprops 8):  p[4]=fog, p[5..7]=r,g,b
+ *   combine_tex_fog      (nprops 7):  p[4]=u, p[5]=v, p[6]=fog
+ *   combine_tex_fog_rgb  (nprops 10): p[4]=u, p[5]=v, p[6]=fog, p[7..9]=r,g,b
+ * Fog factor is interpolated like any other prop (same math as the
+ * generic rasterizer, no visual change), then each pixel is blended
+ * toward fog_color with integer math: (fog*c + (255-fog)*fc + 127) >> 8.
+ * All three shaders are opaque (draw_flags == 0), so only z_test/z_write.
+ * ==================================================================== */
+
 /* --- untextured + fog (combine_fog_rgb): distant terrain, walls --- */
 static void opt_scan_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
         float *p, const Vector2 *dp, UNUSED const struct Texture * const tex) {
@@ -1100,6 +1211,12 @@ static void opt_scan_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
             if (!z_test || (uint16_t)zz <= *zb) {
                 if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
                 const int ia = 255 - ff;
+                // FIX(v9.5): the fog blend was INVERTED (ff*c + ia*fog):
+                // at fog=0 pixels got pure fog_color and at fog=255 pure
+                // color -> every tex_fog surface (fences, iron bars...)
+                // was uniformly gray regardless of distance. Correct
+                // direction, matching rgba_blend(fog_color, c, fog):
+                // out = fog*fog_color + (255-fog)*color.
                 opt_put(dst,
                     (ia * rr + ff * fcr + 127) >> 8,
                     (ia * gg + ff * fcg + 127) >> 8,
@@ -1126,6 +1243,9 @@ static void opt_scan_tex_fog(opt_pix_t *dst, uint16_t *zb, int n,
     const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
     const bool bil = tex->filter;
     const int fcr = fog_color.r, fcg = fog_color.g, fcb = fog_color.b;
+    // FIX(v9.2): this combiner also serves texture-edge shaders
+    // (SH_MT_TEXTURE has no alpha split), resolve draw mode like the
+    // other fast paths. Source alpha = texel alpha (fog only affects RGB).
     const uint32_t dfl = cur_shader->draw_flags;
     const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
     const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
@@ -1154,50 +1274,76 @@ static void opt_scan_tex_fog(opt_pix_t *dst, uint16_t *zb, int n,
         const int dz = (zz1 - zz) / cnt;
 
         for (int k = cnt; k; --k) {
-            uint32_t tc;
+            /* OPTIMIZATION (v11): alpha-first early-out (see
+             * opt_scan_tex_rgba): texture-edge shaders (masks, sky edge
+             * quads) are mostly transparent. Compute the alpha channel
+             * first (1-channel bilinear), reject transparent pixels, and
+             * only pay the 3-channel bilinear + fog blend for pixels that
+             * are actually written. Source alpha = texel alpha (fog only
+             * affects RGB, see v9.2). */
+            uint32_t c00, c10, c01, c11;
+            int fx, fy;
+            int ta;
             if (bil) {
                 const int x0 = uu >> 16, y0 = vv >> 16;
-                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                fx = (uu >> 8) & 0xFF; fy = (vv >> 8) & 0xFF;
                 const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
                 const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
-                const uint32_t c00 = tpix[yb * tex->w + xb];
-                const uint32_t c10 = tpix[yb * tex->w + xn];
-                const uint32_t c01 = tpix[yn * tex->w + xb];
-                const uint32_t c11 = tpix[yn * tex->w + xn];
-                uint32_t out = 0;
-                for (uint32_t ch = 0; ch < 4; ++ch) {
-                    const uint32_t sh = ch * 8;
-                    const int t = (int)((c00 >> sh) & 0xFF) * (256 - fx) + (int)((c10 >> sh) & 0xFF) * fx;
-                    const int b = (int)((c01 >> sh) & 0xFF) * (256 - fx) + (int)((c11 >> sh) & 0xFF) * fx;
-                    out |= ((uint32_t)((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8)) << sh);
-                }
-                tc = out;
+                c00 = tpix[yb * tex->w + xb];
+                c10 = tpix[yb * tex->w + xn];
+                c01 = tpix[yn * tex->w + xb];
+                c11 = tpix[yn * tex->w + xn];
+                const int t = (int)((c00 >> 24) & 0xFF) * (256 - fx) + (int)((c10 >> 24) & 0xFF) * fx;
+                const int b = (int)((c01 >> 24) & 0xFF) * (256 - fx) + (int)((c11 >> 24) & 0xFF) * fx;
+                ta = ((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8;
             } else {
-                tc = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                fx = 0; fy = 0;
+                c00 = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                c10 = c01 = c11 = c00;
+                ta = (int)((c00 >> 24) & 0xFF);
             }
             if (!z_test || (uint16_t)zz <= *zb) {
-                if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
-                const int ia = 255 - ff;
-                const int fr = (ia * (int)(tc & 0xFF)          + ff * fcr + 127) >> 8;
-                const int fg = (ia * (int)((tc >> 8) & 0xFF)   + ff * fcg + 127) >> 8;
-                const int fb = (ia * (int)((tc >> 16) & 0xFF)  + ff * fcb + 127) >> 8;
-                const int ta = (tc >> 24) & 0xFF;
-                if (!do_blend) {
-                    opt_put(dst, fr, fg, fb);
-                    if (z_write) *zb = (uint16_t)zz;
-                } else if (!do_edge || ta > 0x80) {
-                    if (ta >= 255) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else {
+                    if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                    const int ia = 255 - ff;
+                    // fogged RGB (fog applies to color only, never alpha)
+                    // FIX(v9.5): fog blend direction (was inverted, see
+                    // opt_scan_fog_rgb): out = fog*fog_color + (255-fog)*texel
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    const int fr = (ia * tr + ff * fcr + 127) >> 8;
+                    const int fg = (ia * tg + ff * fcg + 127) >> 8;
+                    const int fb = (ia * tb + ff * fcb + 127) >> 8;
+                    if (!do_blend) {
                         opt_put(dst, fr, fg, fb);
-                    } else if (ta > 0) {
-                        int dr_, dg_, db_;
-                        opt_get(dst, &dr_, &dg_, &db_);
-                        const int iat = 255 - ta;
-                        opt_put(dst,
-                            (fr * ta + dr_ * iat + 127) >> 8,
-                            (fg * ta + dg_ * iat + 127) >> 8,
-                            (fb * ta + db_ * iat + 127) >> 8);
+                        if (z_write) *zb = (uint16_t)zz;
+                    } else if (ta == 0) {
+                        // blend with 0 alpha: the color write is a no-op,
+                        // keep only the z write (draw_pixel_blend_zwrite)
+                        if (z_write) *zb = (uint16_t)zz;
+                    } else {
+                        if (ta >= 255) {
+                            opt_put(dst, fr, fg, fb);
+                        } else {
+                            int dr_, dg_, db_;
+                            opt_get(dst, &dr_, &dg_, &db_);
+                            const int iat = 255 - ta;
+                            opt_put(dst,
+                                (fr * ta + dr_ * iat + 127) >> 8,
+                                (fg * ta + dg_ * iat + 127) >> 8,
+                                (fb * ta + db_ * iat + 127) >> 8);
+                        }
+                        if (z_write) *zb = (uint16_t)zz;
                     }
-                    if (z_write) *zb = (uint16_t)zz;
                 }
             }
             ++dst; ++zb;
@@ -1281,6 +1427,8 @@ static void opt_scan_tex_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
                 const int tr = ((tc & 0xFF) * rr + 127) >> 8;
                 const int tg = (((tc >> 8) & 0xFF) * gg + 127) >> 8;
                 const int tb = (((tc >> 16) & 0xFF) * bb + 127) >> 8;
+                // FIX(v9.5): fog blend direction (was inverted, see
+                // opt_scan_fog_rgb): out = fog*fog_color + (255-fog)*color
                 opt_put(dst,
                     (ia * tr + ff * fcr + 127) >> 8,
                     (ia * tg + ff * fcg + 127) >> 8,
@@ -1293,6 +1441,585 @@ static void opt_scan_tex_fog_rgb(opt_pix_t *dst, uint16_t *zb, int n,
             zz += dz;
         }
         for (int i = 2; i < 10; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- texture only, no shade (combine_tex): skybox with fog OFF.
+ *     FIX(v10.2): the SH_MT_TEXTURE branch in create_and_load_new_shader
+ *     does NOT check opt_alpha, so combine_tex shaders can carry
+ *     DRAW_BLEND / DRAW_BLEND_EDGE (file-select hand, trees, RGBA
+ *     overlays). The scanline must therefore resolve the draw mode and
+ *     use the TEXEL alpha, exactly like opt_scan_tex_fog (see v9.2):
+ *     the previous opaque-only version painted transparent texels
+ *     black (square/triangle artifacts around sprites). */
+static void opt_scan_tex(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[6];
+        for (int i = 2; i < 6; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            /* OPTIMIZATION (v11): alpha-first early-out (see opt_scan_tex_rgba):
+             * texture-edge fullscreen quads (masks) are mostly transparent. */
+            uint32_t c00, c10, c01, c11;
+            int fx, fy;
+            int ta;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                fx = (uu >> 8) & 0xFF; fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                c00 = tpix[yb * tex->w + xb];
+                c10 = tpix[yb * tex->w + xn];
+                c01 = tpix[yn * tex->w + xb];
+                c11 = tpix[yn * tex->w + xn];
+                const int t = (int)((c00 >> 24) & 0xFF) * (256 - fx) + (int)((c10 >> 24) & 0xFF) * fx;
+                const int b = (int)((c01 >> 24) & 0xFF) * (256 - fx) + (int)((c11 >> 24) & 0xFF) * fx;
+                ta = (((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8);
+            } else {
+                fx = 0; fy = 0;
+                c00 = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                c10 = c01 = c11 = c00;
+                ta = (int)((c00 >> 24) & 0xFF);
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else if (!do_blend) {
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    opt_put(dst, tr, tg, tb);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (ta == 0) {
+                    // blend with 0 alpha: no-op color write, keep z write
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    if (ta >= 255) {
+                        opt_put(dst, tr, tg, tb);
+                    } else {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int ia = 255 - ta;
+                        opt_put(dst,
+                            (tr * ta + dr_ * ia + 127) >> 8,
+                            (tg * ta + dg_ * ia + 127) >> 8,
+                            (tb * ta + db_ * ia + 127) >> 8);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv;
+            zz += dz;
+        }
+        for (int i = 2; i < 6; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- FAST(v12): combine_tex_rgba_texa (id 0x01A00045) - fullscreen
+ * blended overlays (level fades) used the GENERIC path: ~30 triangles
+ * covering the screen costed ~400 ms per 60 frames. Same as
+ * opt_scan_tex but rgb is modulated by the vertex color; alpha comes
+ * from the texel only (cc.a == 0xFF in combine_tex_rgba_texa). */
+static void opt_scan_tex_rgba_texa(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int rr = (int)(p[6] * w0);
+        int gg = (int)(p[7] * w0);
+        int bb = (int)(p[8] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[9];
+        for (int i = 2; i < 9; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int rr1 = (int)(q[6] * w1);
+        const int gg1 = (int)(q[7] * w1);
+        const int bb1 = (int)(q[8] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            /* OPTIMIZATION (v11): alpha-first early-out, see opt_scan_tex */
+            uint32_t c00, c10, c01, c11;
+            int fx, fy;
+            int ta;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                fx = (uu >> 8) & 0xFF; fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                c00 = tpix[yb * tex->w + xb];
+                c10 = tpix[yb * tex->w + xn];
+                c01 = tpix[yn * tex->w + xb];
+                c11 = tpix[yn * tex->w + xn];
+                const int t = (int)((c00 >> 24) & 0xFF) * (256 - fx) + (int)((c10 >> 24) & 0xFF) * fx;
+                const int b = (int)((c01 >> 24) & 0xFF) * (256 - fx) + (int)((c11 >> 24) & 0xFF) * fx;
+                ta = ((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8;
+            } else {
+                fx = 0; fy = 0;
+                c00 = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                c10 = c01 = c11 = c00;
+                ta = (int)((c00 >> 24) & 0xFF);
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else if (!do_blend) {
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    opt_put(dst, (tr * rr + 127) >> 8, (tg * gg + 127) >> 8, (tb * bb + 127) >> 8);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (ta == 0) {
+                    // blend with 0 alpha: no-op color write, keep z write
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    const int sr = (tr * rr + 127) >> 8;
+                    const int sg = (tg * gg + 127) >> 8;
+                    const int sb = (tb * bb + 127) >> 8;
+                    if (ta >= 255) {
+                        opt_put(dst, sr, sg, sb);
+                    } else {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int ia = 255 - ta;
+                        opt_put(dst,
+                            (sr * ta + dr_ * ia + 127) >> 8,
+                            (sg * ta + dg_ * ia + 127) >> 8,
+                            (sb * ta + db_ * ia + 127) >> 8);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv;
+            rr += dr; gg += dg; bb += db;
+            zz += dz;
+        }
+        for (int i = 2; i < 9; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- FAST(v12): combine_tex_fog_rgba (id 0x03200045 & co) - fogged
+ * alpha-blended textured geometry (water, translucent walls) ran in
+ * the GENERIC path: up to 1300 ms per 60 frames. rgb = fog blend of
+ * (texel * vertex color), alpha = texel.a * vertex.a (fog is RGB-only,
+ * see FIX(v9.2)). */
+static void opt_scan_tex_fog_rgba(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const int fcr = fog_color.r, fcg = fog_color.g, fcb = fog_color.b;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int ff = (int)(p[6] * w0);
+        int rr = (int)(p[7] * w0);
+        int gg = (int)(p[8] * w0);
+        int bb = (int)(p[9] * w0);
+        int aa = (int)(p[10] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[11];
+        for (int i = 2; i < 11; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int ff1 = (int)(q[6] * w1);
+        const int rr1 = (int)(q[7] * w1);
+        const int gg1 = (int)(q[8] * w1);
+        const int bb1 = (int)(q[9] * w1);
+        const int aa1 = (int)(q[10] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int df = (ff1 - ff) / cnt;
+        const int dr = (rr1 - rr) / cnt;
+        const int dg = (gg1 - gg) / cnt;
+        const int db = (bb1 - bb) / cnt;
+        const int da = (aa1 - aa) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            /* OPTIMIZATION (v11): alpha-first early-out (see
+             * opt_scan_tex_rgba): translucent fogged geometry is often
+             * mostly transparent. ta = texel alpha modulated by the
+             * vertex alpha; fog never touches alpha (FIX(v9.2)). */
+            uint32_t c00, c10, c01, c11;
+            int fx, fy;
+            int ta;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                fx = (uu >> 8) & 0xFF; fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                c00 = tpix[yb * tex->w + xb];
+                c10 = tpix[yb * tex->w + xn];
+                c01 = tpix[yn * tex->w + xb];
+                c11 = tpix[yn * tex->w + xn];
+                const int t = (int)((c00 >> 24) & 0xFF) * (256 - fx) + (int)((c10 >> 24) & 0xFF) * fx;
+                const int b = (int)((c01 >> 24) & 0xFF) * (256 - fx) + (int)((c11 >> 24) & 0xFF) * fx;
+                ta = ((((t >> 8) * (256 - fy) + (b >> 8) * fy) >> 8) * aa + 127) >> 8;
+            } else {
+                fx = 0; fy = 0;
+                c00 = tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)];
+                c10 = c01 = c11 = c00;
+                ta = ((int)((c00 >> 24) & 0xFF) * aa + 127) >> 8;
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else if (!do_blend) {
+                    if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                    const int ia = 255 - ff;
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    const int fr = (ia * ((tr * rr + 127) >> 8) + ff * fcr + 127) >> 8;
+                    const int fg = (ia * ((tg * gg + 127) >> 8) + ff * fcg + 127) >> 8;
+                    const int fb = (ia * ((tb * bb + 127) >> 8) + ff * fcb + 127) >> 8;
+                    opt_put(dst, fr, fg, fb);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (ta == 0) {
+                    // blend with 0 alpha: the color write is a no-op,
+                    // keep only the z write (draw_pixel_blend_zwrite)
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    if (ff < 0) ff = 0; else if (ff > 255) ff = 255;
+                    const int ia = 255 - ff;
+                    const int tr_t = ((int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx) >> 8;
+                    const int tr_b = ((int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx) >> 8;
+                    const int tr = bil ? (tr_t * (256 - fy) + tr_b * fy) >> 8 : (int)(c00 & 0xFF);
+                    const int tg_t = ((int)((c00 >> 8) & 0xFF) * (256 - fx) + (int)((c10 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg_b = ((int)((c01 >> 8) & 0xFF) * (256 - fx) + (int)((c11 >> 8) & 0xFF) * fx) >> 8;
+                    const int tg = bil ? (tg_t * (256 - fy) + tg_b * fy) >> 8 : (int)((c00 >> 8) & 0xFF);
+                    const int tb_t = ((int)((c00 >> 16) & 0xFF) * (256 - fx) + (int)((c10 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb_b = ((int)((c01 >> 16) & 0xFF) * (256 - fx) + (int)((c11 >> 16) & 0xFF) * fx) >> 8;
+                    const int tb = bil ? (tb_t * (256 - fy) + tb_b * fy) >> 8 : (int)((c00 >> 16) & 0xFF);
+                    const int fr = (ia * ((tr * rr + 127) >> 8) + ff * fcr + 127) >> 8;
+                    const int fg = (ia * ((tg * gg + 127) >> 8) + ff * fcg + 127) >> 8;
+                    const int fb = (ia * ((tb * bb + 127) >> 8) + ff * fcb + 127) >> 8;
+                    if (ta >= 255) {
+                        opt_put(dst, fr, fg, fb);
+                    } else {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int iat = 255 - ta;
+                        opt_put(dst,
+                            (fr * ta + dr_ * iat + 127) >> 8,
+                            (fg * ta + dg_ * iat + 127) >> 8,
+                            (fb * ta + db_ * iat + 127) >> 8);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv; ff += df;
+            rr += dr; gg += dg; bb += db; aa += da;
+            zz += dz;
+        }
+        for (int i = 2; i < 11; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- FAST(v12): combine_rgba_rgba (id 0x01081081) - untextured
+ * dual-color blend overlays (fade circles) ran in the GENERIC path:
+ * ~80 triangles costed ~420 ms per 60 frames. out = ca * cb on all
+ * 4 channels (see rgba_modulate). */
+static void opt_scan_rgba_rgba(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    (void)tex;
+    const int zoff = (int)z_offset;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int r1 = (int)(p[4] * w0);
+        int g1 = (int)(p[5] * w0);
+        int b1 = (int)(p[6] * w0);
+        int a1 = (int)(p[7] * w0);
+        int r2 = (int)(p[8] * w0);
+        int g2 = (int)(p[9] * w0);
+        int b2 = (int)(p[10] * w0);
+        int a2 = (int)(p[11] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[12];
+        for (int i = 2; i < 12; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int r12 = (int)(q[4] * w1);
+        const int g12 = (int)(q[5] * w1);
+        const int b12 = (int)(q[6] * w1);
+        const int a12 = (int)(q[7] * w1);
+        const int r22 = (int)(q[8] * w1);
+        const int g22 = (int)(q[9] * w1);
+        const int b22 = (int)(q[10] * w1);
+        const int a22 = (int)(q[11] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int d1r = (r12 - r1) / cnt;
+        const int d1g = (g12 - g1) / cnt;
+        const int d1b = (b12 - b1) / cnt;
+        const int d1a = (a12 - a1) / cnt;
+        const int d2r = (r22 - r2) / cnt;
+        const int d2g = (g22 - g2) / cnt;
+        const int d2b = (b22 - b2) / cnt;
+        const int d2a = (a22 - a2) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            const int ta = (a1 * a2 + 127) >> 8;
+            if (!z_test || (uint16_t)zz <= *zb) {
+                if (do_edge && ta <= 0x80) {
+                    // below the edge threshold: nothing written at all
+                } else if (!do_blend) {
+                    opt_put(dst, (r1 * r2 + 127) >> 8, (g1 * g2 + 127) >> 8, (b1 * b2 + 127) >> 8);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (ta == 0) {
+                    // blend with 0 alpha: no-op color write, keep z write
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    const int sr = (r1 * r2 + 127) >> 8;
+                    const int sg = (g1 * g2 + 127) >> 8;
+                    const int sb = (b1 * b2 + 127) >> 8;
+                    if (ta >= 255) {
+                        opt_put(dst, sr, sg, sb);
+                    } else {
+                        int dr_, dg_, db_;
+                        opt_get(dst, &dr_, &dg_, &db_);
+                        const int ia = 255 - ta;
+                        opt_put(dst,
+                            (sr * ta + dr_ * ia + 127) >> 8,
+                            (sg * ta + dg_ * ia + 127) >> 8,
+                            (sb * ta + db_ * ia + 127) >> 8);
+                    }
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            r1 += d1r; g1 += d1g; b1 += d1b; a1 += d1a;
+            r2 += d2r; g2 += d2g; b2 += d2b; a2 += d2a;
+            zz += dz;
+        }
+        for (int i = 2; i < 12; ++i) p[i] = q[i];
+        n -= cnt;
+    }
+}
+
+/* --- FAST(v12): combine_tex_rgb_rgb (id 0x00000551 & co) - the
+ * environment "gradient" shader: texel red channel lerps between two
+ * vertex colors. Ran in the GENERIC path (~180 ms per 60 frames in
+ * tested scenes). Only the RED texel channel is needed: the bilinear
+ * fetch interpolates a single channel. Opaque (alpha == 0xFF from
+ * rgba_lerp on two 0xFF alphas). */
+static void opt_scan_tex_rgb_rgb(opt_pix_t *dst, uint16_t *zb, int n,
+        float *p, const Vector2 *dp, const struct Texture * const tex) {
+    const int fw16 = (int)(tex->fw * 65536.0f);
+    const int fh16 = (int)(tex->fh * 65536.0f);
+    const int zoff = (int)z_offset;
+    const uint8_t wm_x = tex->wrap_mode_x, wm_y = tex->wrap_mode_y;
+    const int tw = tex->wrap_w, th = tex->wrap_h;
+    const uint32_t *tpix = (const uint32_t *)(texcache + tex->addr);
+    const bool bil = tex->filter;
+    const uint32_t dfl = cur_shader->draw_flags;
+    const bool do_blend = (dfl & (DRAW_BLEND | DRAW_BLEND_EDGE)) != 0;
+    const bool do_edge  = (dfl & DRAW_BLEND_EDGE) != 0;
+
+    while (n > 0) {
+        const int cnt = (n > OPT_STEP) ? OPT_STEP : n;
+        const float w0 = 1.0f / p[3];
+        int uu = (int)(p[4] * w0 * fw16);
+        int vv = (int)(p[5] * w0 * fh16);
+        int r1 = (int)(p[6] * w0);
+        int g1 = (int)(p[7] * w0);
+        int b1 = (int)(p[8] * w0);
+        int r2 = (int)(p[9] * w0);
+        int g2 = (int)(p[10] * w0);
+        int b2 = (int)(p[11] * w0);
+        int zz = (int)(p[2] * 65535.0f) + zoff;
+        if (zz < 0) zz = 0; else if (zz > 0xFFFF) zz = 0xFFFF;
+
+        float q[12];
+        for (int i = 2; i < 12; ++i) q[i] = p[i] + cnt * dp[i].x;
+        const float w1 = 1.0f / q[3];
+        const int uu1 = (int)(q[4] * w1 * fw16);
+        const int vv1 = (int)(q[5] * w1 * fh16);
+        const int r12 = (int)(q[6] * w1);
+        const int g12 = (int)(q[7] * w1);
+        const int b12 = (int)(q[8] * w1);
+        const int r22 = (int)(q[9] * w1);
+        const int g22 = (int)(q[10] * w1);
+        const int b22 = (int)(q[11] * w1);
+        int zz1 = (int)(q[2] * 65535.0f) + zoff;
+        if (zz1 < 0) zz1 = 0; else if (zz1 > 0xFFFF) zz1 = 0xFFFF;
+
+        const int du = (uu1 - uu) / cnt;
+        const int dv = (vv1 - vv) / cnt;
+        const int d1r = (r12 - r1) / cnt;
+        const int d1g = (g12 - g1) / cnt;
+        const int d1b = (b12 - b1) / cnt;
+        const int d2r = (r22 - r2) / cnt;
+        const int d2g = (g22 - g2) / cnt;
+        const int d2b = (b22 - b2) / cnt;
+        const int dz = (zz1 - zz) / cnt;
+
+        for (int k = cnt; k; --k) {
+            // texel red channel only (see combine_tex_rgb_rgb)
+            int t;
+            if (bil) {
+                const int x0 = uu >> 16, y0 = vv >> 16;
+                const int fx = (uu >> 8) & 0xFF, fy = (vv >> 8) & 0xFF;
+                const int xb = opt_wrap(x0, tw, wm_x), yb = opt_wrap(y0, th, wm_y);
+                const int xn = opt_wrap(x0 + 1, tw, wm_x), yn = opt_wrap(y0 + 1, th, wm_y);
+                const uint32_t c00 = tpix[yb * tex->w + xb];
+                const uint32_t c10 = tpix[yb * tex->w + xn];
+                const uint32_t c01 = tpix[yn * tex->w + xb];
+                const uint32_t c11 = tpix[yn * tex->w + xn];
+                const int tt = (int)(c00 & 0xFF) * (256 - fx) + (int)(c10 & 0xFF) * fx;
+                const int tb_ = (int)(c01 & 0xFF) * (256 - fx) + (int)(c11 & 0xFF) * fx;
+                t = ((tt >> 8) * (256 - fy) + (tb_ >> 8) * fy) >> 8;
+            } else {
+                t = (int)(tpix[opt_wrap(vv >> 16, th, wm_y) * tex->w + opt_wrap(uu >> 16, tw, wm_x)] & 0xFF);
+            }
+            if (!z_test || (uint16_t)zz <= *zb) {
+                // rgba_lerp(cc2, cc1, t): out = cc1 * t + cc2 * (255 - t)
+                const int ia = 255 - t;
+                const int orr = (r1 * t + r2 * ia + 127) >> 8;
+                const int og = (g1 * t + g2 * ia + 127) >> 8;
+                const int ob = (b1 * t + b2 * ia + 127) >> 8;
+                if (!do_blend) {
+                    opt_put(dst, orr, og, ob);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else if (do_edge) {
+                    // unreachable in practice (both alphas 0xFF), kept
+                    // for consistency with the other fast paths
+                    opt_put(dst, orr, og, ob);
+                    if (z_write) *zb = (uint16_t)zz;
+                } else {
+                    // blend with ta == 0xFF: plain write
+                    opt_put(dst, orr, og, ob);
+                    if (z_write) *zb = (uint16_t)zz;
+                }
+            }
+            ++dst; ++zb;
+            uu += du; vv += dv;
+            r1 += d1r; g1 += d1g; b1 += d1b;
+            r2 += d2r; g2 += d2g; b2 += d2b;
+            zz += dz;
+        }
+        for (int i = 2; i < 12; ++i) p[i] = q[i];
         n -= cnt;
     }
 }
@@ -1409,6 +2136,22 @@ static void rast_fn_fast_fog_rgb(const struct Tri tri) {
 static void rast_fn_fast_tex_fog_rgb(const struct Tri tri) {
     R_RASTERIZE_FAST(tri, 10, opt_scan_tex_fog_rgb);
 }
+static void rast_fn_fast_tex(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 6, opt_scan_tex);
+}
+// FAST(v12): previously-GENERIC shader combinations (see opt_scan_*)
+static void rast_fn_fast_tex_rgba_texa(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 10, opt_scan_tex_rgba_texa);
+}
+static void rast_fn_fast_tex_fog_rgba(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 11, opt_scan_tex_fog_rgba);
+}
+static void rast_fn_fast_rgba_rgba(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 12, opt_scan_rgba_rgba);
+}
+static void rast_fn_fast_tex_rgb_rgb(const struct Tri tri) {
+    R_RASTERIZE_FAST(tri, 12, opt_scan_tex_rgb_rgb);
+}
 
 static inline void pop_triangle(const float *buf, const int stride) {
     Vector4 *v0 = (Vector4 *)buf;
@@ -1435,6 +2178,9 @@ static inline void depth_clear(void) {
 }
 
 static inline void color_clear(void) {
+    // FIX: was hardcoded scr_size << 2 (4 bytes/pixel), which overflowed
+    // the RGB565 framebuffer by 2x under CONVERT. sizeof(*) is correct
+    // in both builds.
     memset(gfx_output, 0x00, scr_size * sizeof(*gfx_output));
 }
 
@@ -1493,6 +2239,13 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
     prg->shader_id = shader_id;
     prg->cc = ccf;
 
+    // FIX(v9.3): the hardcoded combiner ids below were captured with fog
+    // off. Enabling fog ORs SHADER_OPT_FOG into the id, so those checks
+    // silently stopped matching -> decal geometry got the generic fog
+    // combiner (texel modulated by gray vertex color). When fog is on,
+    // compare with the fog bit masked off so decal shaders keep their
+    // dedicated combiners; with fog off the id is compared raw, exactly
+    // as before.
     const uint32_t base_id = ccf.opt_fog ? (shader_id & ~(uint32_t)SHADER_OPT_FOG) : shader_id;
 
     int num_props = 0;
@@ -1553,6 +2306,16 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
     // pick rasterizer that interps the amount of float properties this shader requires
     prg->rast = rast_funcs[num_props];
 
+    // OPTIMIZATION: route the dominant shaders to the fused integer-only
+    // fast paths (no per-pixel division, no indirect calls). Together they
+    // cover the vast majority of rendered pixels in SM64. Works in both
+    // 32bpp and CONVERT (RGB565) builds. v9: fog variants get their own
+    // fused paths too. Alpha fog variants keep the generic path (rare).
+    // NOTE(v9): num_props here is the index into rast_funcs, i.e. it does
+    // NOT include the 4 vertex attributes (x, y, z, w). The v8 constants
+    // were written with the totals (9/10/8/7) and therefore never matched:
+    // the fast paths were dead code. Correct indices: tex_rgb=5, tex_rgba=6,
+    // rgba=4, rgb=3, tex_fog_rgb=6, fog_rgb=4, tex_fog=3.
     if (num_props == 5 && prg->combine == combine_tex_rgb)
         prg->rast = rast_fn_fast_tex_rgb;
     else if (num_props == 6 && prg->combine == combine_tex_rgba)
@@ -1567,6 +2330,22 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
         prg->rast = rast_fn_fast_fog_rgb;
     else if (num_props == 3 && prg->combine == combine_tex_fog)
         prg->rast = rast_fn_fast_tex_fog;
+    else if (num_props == 2 && prg->combine == combine_tex)
+        prg->rast = rast_fn_fast_tex;
+    // FAST(v12): the shader ids below were measured running the GENERIC
+    // rasterizer at a heavy cost (per-shader timing, 60-frame windows):
+    //   0x01A00045 combine_tex_rgba_texa   ~30 tris  ~400 ms (fades)
+    //   0x03200045 combine_tex_fog_rgba    ~12k tris ~1300 ms (fog+alpha)
+    //   0x01081081 combine_rgba_rgba        ~80 tris  ~420 ms (overlays)
+    //   0x00000551 combine_tex_rgb_rgb    ~14k tris  ~180 ms (gradients)
+    else if (num_props == 6 && prg->combine == combine_tex_rgba_texa)
+        prg->rast = rast_fn_fast_tex_rgba_texa;
+    else if (num_props == 7 && prg->combine == combine_tex_fog_rgba)
+        prg->rast = rast_fn_fast_tex_fog_rgba;
+    else if (num_props == 8 && prg->combine == combine_rgba_rgba)
+        prg->rast = rast_fn_fast_rgba_rgba;
+    else if (num_props == 8 && prg->combine == combine_tex_rgb_rgb)
+        prg->rast = rast_fn_fast_tex_rgb_rgb;
 
     gfx_soft_load_shader(prg);
 
@@ -1743,6 +2522,9 @@ static void gfx_soft_fill_rect(int x0, int y0, int x1, int y1, const uint8_t *rg
     x1 = imin(scr_width, x1);
     y1 = imin(scr_height, y1);
 #ifndef CONVERT
+    // FIX(CONVERT): the old code unconditionally used uint32_t here, which
+    // under CONVERT (uint16_t RGB565 framebuffer) wrote 2x the buffer size
+    // on every fill/clear -> heap corruption, the startup crash.
     register const uint32_t color = *(uint32_t *)rgba;
     register uint32_t *base = gfx_output + y0 * scr_width + x0;
     register uint32_t *p;
