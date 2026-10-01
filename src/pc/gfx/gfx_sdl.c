@@ -336,6 +336,11 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
 
 	SDL_ShowCursor(0);
   #ifdef CONVERT
+    // FIX(v8, CONVERT): the RGB565 build now uses the SAME adaptive
+    // resolution flow as the 32bpp one: a 16bpp display surface plus a
+    // bank of 16bpp sub-resolution surfaces. gfx_output points into
+    // the current sub-surface (SDL_SURFACE), the swap blits subRes[0]
+    // to the display surface, and the upscale uses the 16-bit NN.
     texture = SDL_SetVideoMode(window_width, window_height, 16, SDL_HWSURFACE | SDL_TRIPLEBUF);
     if (!texture) {
       printf("SDL: 16bpp HWSURFACE failed (%s), falling back to SWSURFACE\n", SDL_GetError());
@@ -668,6 +673,8 @@ static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Rect
 
 static SDL_Rect middle_rect = {0,0,320,240};
 
+/// FIX(v8, CONVERT): 16-bit variant of the nearest-neighbor upscale, for
+/// the RGB565 build where the sub-resolution surfaces are 16bpp.
 static void flip_NNOptimized_AllowOutOfScreen16(SDL_Surface *src_surface, SDL_Rect *src_rect, SDL_Surface *dst_surface, int new_w, int new_h) {
   int w1 = src_rect->w;
   int h1 = src_rect->h;
