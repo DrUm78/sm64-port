@@ -1135,8 +1135,15 @@ static void gfx_calc_and_set_viewport(const Vp_t *viewport) {
 
     rdp.viewport.x = x;
     rdp.viewport.y = y;
-    rdp.viewport.width = width;
-    rdp.viewport.height = height;
+    // FIX(v14, adaptive res): width/height are uint16_t fields assigned
+    // from floats. At dynamic sub-resolutions with an odd factor,
+    // h * (h_sub / 240) evaluates to h_sub - epsilon in float, and the
+    // implicit truncation clipped the rasterizer one row short (the
+    // softrast y axis is bottom-up, so the lost row is at the TOP of
+    // the screen: the previous frame showed through as a stale line).
+    // Round half-up on the extents so the full area is always covered.
+    rdp.viewport.width = width + 0.5f;
+    rdp.viewport.height = height + 0.5f;
 
     rdp.viewport_or_scissor_changed = true;
 }
@@ -1205,8 +1212,11 @@ static void gfx_dp_set_scissor(uint32_t mode, uint32_t ulx, uint32_t uly, uint32
 
     rdp.scissor.x = x;
     rdp.scissor.y = y;
-    rdp.scissor.width = width;
-    rdp.scissor.height = height;
+    // FIX(v14, adaptive res): round the extents up (see the matching
+    // fix in gfx_calc_and_set_viewport) so a full-screen scissor never
+    // loses its last row to float truncation at sub-resolutions.
+    rdp.scissor.width = width + 0.5f;
+    rdp.scissor.height = height + 0.5f;
 
     rdp.viewport_or_scissor_changed = true;
 }
@@ -1492,7 +1502,7 @@ static void gfx_dp_texture_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int3
         lrxf = HALF_SCREEN_WIDTH + gfx_adjust_x_for_aspect_ratio(lrxf / 4.0f - HALF_SCREEN_WIDTH);
         ulyf = ulyf / 4.0f;
         lryf = lryf / 4.0f;
-        gfx_rapi->tex_rect(ulxf, ulyf, lrxf, lryf, uls / 32.f, ult / 32.f, dudx / 8.f, dvdy / 8.f, &rdp.env_color.r);
+        gfx_rapi->tex_rect(ulxf, ulyf, (int)(lrxf + 0.5f), (int)(lryf + 0.5f), uls / 32.f, ult / 32.f, dudx / 8.f, dvdy / 8.f, &rdp.env_color.r);
     } else {
         struct LoadedVertex* ul = &rsp.loaded_vertices[MAX_VERTICES + 0];
         struct LoadedVertex* ll = &rsp.loaded_vertices[MAX_VERTICES + 1];
@@ -1545,7 +1555,13 @@ static void gfx_dp_fill_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int32_t
         lrxf = HALF_SCREEN_WIDTH + gfx_adjust_x_for_aspect_ratio(lrxf / 4.0f - HALF_SCREEN_WIDTH);
         ulyf = ulyf / 4.0f;
         lryf = lryf / 4.0f;
-        gfx_rapi->fill_rect(ulxf, ulyf, lrxf, lryf, &rdp.fill_color.r);
+        // FIX(v14, adaptive res): round the bottom-right edges up so a
+        // full-screen rect never loses its last row/column to float
+        // truncation at sub-resolutions (stale line from the previous
+        // frame). Top-left edges keep truncation, which only extends
+        // coverage. At full resolution (ratio 1:1) the values are exact
+        // integers and this changes nothing.
+        gfx_rapi->fill_rect(ulxf, ulyf, (int)(lrxf + 0.5f), (int)(lryf + 0.5f), &rdp.fill_color.r);
     } else {
         for (int i = MAX_VERTICES; i < MAX_VERTICES + 4; i++) {
             struct LoadedVertex* v = &rsp.loaded_vertices[i];

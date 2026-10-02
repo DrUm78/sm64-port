@@ -88,6 +88,11 @@ SDL_Surface *texture SAVESTATE_EXCLUDE = NULL;
 #define NB_SUBRESOLUTIONS ( (1<<(SUB_RES_DIVIDER-1))/2 + 1 )
 static SDL_Surface *sdl_screen_subRes[NB_SUBRESOLUTIONS] SAVESTATE_EXCLUDE;
 static SDL_Rect resolutions[NB_SUBRESOLUTIONS];
+// FIX(v14): declared here (was defined near its only other use, after
+// gfx_sdl_init) because gfx_sdl_init now syncs it with the configured
+// screen size - the hardcoded 320x240 default left the swap blit src
+// rect out of sync with configScreenWidth/configScreenHeight.
+static SDL_Rect middle_rect = {40,0,240,240};
 //static bool half_res = false;
 static int current_res_idx SAVESTATE_EXCLUDE = 0;
 
@@ -356,13 +361,16 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     int dividend = (1 << (SUB_RES_DIVIDER-1));
     for(int i=0; i < NB_SUBRESOLUTIONS; i++){
       int factor = dividend-i;
-      resolutions[i].w = window_width*factor/dividend;
-      resolutions[i].h = window_height*factor/dividend;
+      resolutions[i].w = (window_width*factor + dividend/2)/dividend;
+      resolutions[i].h = (window_height*factor + dividend/2)/dividend;
       sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 16, 0,0,0,0);
     }
 
     current_res_idx = 0;
     sdl_screen = sdl_screen_subRes[current_res_idx];
+
+    middle_rect.w = window_width;
+    middle_rect.h = window_height;
 
     init_menu_SDL();
   #else
@@ -375,8 +383,8 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       for(int i=0; i < NB_SUBRESOLUTIONS; i++){
         int factor = dividend-i;
         DEBUG_ADAPTATIVE_RES_PRINTF("NB_SUBRESOLUTIONS=%d, i=%d, factor=%d, dividend=%d\n",NB_SUBRESOLUTIONS, i, factor, dividend);
-        resolutions[i].w = window_width*factor/dividend;
-        resolutions[i].h = window_height*factor/dividend;
+        resolutions[i].w = (window_width*factor + dividend/2)/dividend;
+        resolutions[i].h = (window_height*factor + dividend/2)/dividend;
         sdl_screen_subRes[i] = SDL_CreateRGBSurface(SDL_SWSURFACE, resolutions[i].w, resolutions[i].h, 32, 0,0,0,0);  
         DEBUG_ADAPTATIVE_RES_PRINTF("Creating surface for sub resolution[%d]: %dx%d \n", i, resolutions[i].w, resolutions[i].h);
       }
@@ -384,6 +392,9 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
       //set_halfResScreen(!start_in_fullscreen, false);
       current_res_idx = 0;
       sdl_screen = sdl_screen_subRes[current_res_idx];
+
+      middle_rect.w = window_width;
+      middle_rect.h = window_height;
 
       init_menu_SDL();
     #endif
@@ -670,7 +681,6 @@ static void flip_NNOptimized_AllowOutOfScreen(SDL_Surface *src_surface, SDL_Rect
   }
 }
 
-static SDL_Rect middle_rect = {40,0,240,240};
 
 /// FIX(v8, CONVERT): 16-bit variant of the nearest-neighbor upscale, for
 /// the RGB565 build where the sub-resolution surfaces are 16bpp.

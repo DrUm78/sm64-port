@@ -2464,8 +2464,19 @@ static void gfx_soft_set_viewport(int x, int y, int width, int height) {
     r_view.y = y;
     r_view.w = width;
     r_view.h = height;
-    r_view.hw = width >> 1;
-    r_view.hh = height >> 1;
+    // FIX(v15, adaptive res): hw/hh used to be computed with integer
+    // truncation (width >> 1), which for ODD sizes covered only
+    // 2 * (height >> 1) = height - 1 rows: at odd dynamic
+    // sub-resolutions the row y = height - 1 (the bottom-up y axis
+    // maps it to framebuffer row 0, the TOP of the screen) was never
+    // touched by geometry and kept the previous frame's content. The
+    // NN upscale maps the two top destination rows to that single
+    // source row (y_ratio < 1.0), so the stale line showed as a 2px
+    // band at the top of the screen. cx/cy/hw/hh are floats: use the
+    // exact half size so coverage is precisely [x, x + width) x
+    // [y, y + height). Even sizes are bit-identical to the old code.
+    r_view.hw = width * 0.5f;
+    r_view.hh = height * 0.5f;
     r_view.cx = x + r_view.hw;
     r_view.cy = y + r_view.hh;
 }
