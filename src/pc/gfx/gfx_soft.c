@@ -2262,7 +2262,7 @@ static struct ShaderProgram *gfx_soft_create_and_load_new_shader(uint32_t shader
         prg->mix = SH_MT_TEXTURE_COLOR;
         if (ccf.num_inputs > 1)
             prg->combine = combine_tex_rgb_rgb; // only one such known shader
-        else if (base_id == 0x0000038D || base_id == 0x01200A00 || base_id == 0x01045A00 || base_id == 0x0120038D)
+        else if (base_id == 0x0000038D || base_id == 0x01200A00 || base_id == 0x01045A00 || base_id == 0x0120038D || base_id == 0x0920038D)
             if (ccf.opt_alpha) {
                 bool alpha_uses_texel = false;
                 for (int k = 0; k < 4; k++)
