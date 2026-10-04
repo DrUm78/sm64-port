@@ -99,6 +99,7 @@ struct TextureHashmapNode {
     uint32_t texture_id;
     uint8_t cms, cmt;
     bool linear_filter;
+    uint32_t checksum; // content checksum, for dynamically rewritten source buffers
 };
 static struct {
     struct TextureHashmapNode *hashmap[1024];
@@ -292,12 +293,44 @@ static struct ColorCombiner *gfx_lookup_or_create_color_combiner(uint32_t cc_id)
     return prev_combiner = comb;
 }
 
+/*
+ * Textures whose source buffer is dynamically rewritten each frame (EU/JP
+ * dialog glyphs are unpacked from IA1 into display-list memory by
+ * alloc_ia4_tex_from_i1 / alloc_ia8_text_from_i1) reuse the SAME addresses
+ * with DIFFERENT contents across frames and dialog pages. The cache is keyed
+ * by address, so stale glyphs were rendered ("EU version has buggy texts").
+ * For those small textures, validate entries with a content checksum; on
+ * change, keep the same texture slot and re-import in place (important for
+ * softrast: its texture cache is a bump allocator that never shrinks, and
+ * its texture slot counter aborts at MAX_TEXTURES).
+ */
+#define GFX_CACHE_CONTENT_CHECK_MAX_BYTES 1024
+
+static uint32_t gfx_texture_data_checksum(const uint8_t *addr, uint32_t size) {
+    uint32_t h = 0x9e3779b9u;
+    for (uint32_t i = 0; i < size; i++) {
+        h = (h * 31u) ^ addr[i];
+    }
+    return h;
+}
+
 static bool gfx_texture_cache_lookup(int tile, struct TextureHashmapNode **n, const uint8_t *orig_addr, uint32_t fmt, uint32_t siz) {
     size_t hash = (uintptr_t)orig_addr;
     hash = (hash >> 5) & 0x3ff;
+    const uint32_t size_bytes = rdp.loaded_texture[tile].size_bytes;
+    const bool check_content = size_bytes <= GFX_CACHE_CONTENT_CHECK_MAX_BYTES;
+    const uint32_t data_checksum = check_content ? gfx_texture_data_checksum(orig_addr, size_bytes) : 0;
     struct TextureHashmapNode **node = &gfx_texture_cache.hashmap[hash];
     while (*node != NULL && *node - gfx_texture_cache.pool < (int)gfx_texture_cache.pool_pos) {
         if ((*node)->texture_addr == orig_addr && (*node)->fmt == fmt && (*node)->siz == siz) {
+            if (check_content && (*node)->checksum != data_checksum) {
+                // Same address, new contents (dynamic buffer): keep the slot,
+                // force a re-import which re-uploads into this texture id.
+                (*node)->checksum = data_checksum;
+                gfx_rapi->select_texture(tile, (*node)->texture_id);
+                *n = *node;
+                return false;
+            }
             gfx_rapi->select_texture(tile, (*node)->texture_id);
             *n = *node;
             return true;
@@ -323,6 +356,7 @@ static bool gfx_texture_cache_lookup(int tile, struct TextureHashmapNode **n, co
     (*node)->texture_addr = orig_addr;
     (*node)->fmt = fmt;
     (*node)->siz = siz;
+    (*node)->checksum = data_checksum;
     *n = *node;
     return false;
 }
@@ -1488,7 +1522,13 @@ static void gfx_dp_texture_rectangle(int32_t ulx, int32_t uly, int32_t lrx, int3
     float lrs = ((uls << 7) + dsdx * width) >> 7;
     float lrt = ((ult << 7) + dtdy * height) >> 7;
 
-    if (gfx_rapi->tex_rect) {
+    // G_TEXRECTFLIP transposes the S/T axes relative to the screen (S steps
+    // along the rectangle's Y extent, T along its X extent, per the RDP
+    // convention). The tex_rect fast-path API can only express u stepping
+    // along X and v along Y, so flipped rectangles (EU dialog glyphs, the
+    // only G_TEXRECTFLIP user in SM64) must take the generic vertex path,
+    // which assigns ll=(lrs,ult) / ur=(uls,lrt) and is hardware-correct.
+    if (gfx_rapi->tex_rect && !flip) {
         float ulxf = ulx * ratio_x;
         float ulyf = uly * ratio_y;
         float lrxf = lrx * ratio_x;

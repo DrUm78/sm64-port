@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=Super Mario 64 (U)
+Name=Super Mario 64 (E)
 Comment=Super Mario 64 port for the GKD 350H
-Exec=sm64.us.f3dex2e
+Exec=sm64.eu.f3dex2e
 Icon=sm64
 Categories=games

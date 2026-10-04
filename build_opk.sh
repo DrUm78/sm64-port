@@ -12,10 +12,14 @@ make distclean
 #convert textures/segment2/segment2.05A00.rgba16.png -resize 32x32! build/icon.png
 #mksquashfs build/us_pc/sm64.us.f3dex2e ./run.sh build/icon.png default."$1".desktop sm64-port-"$1".opk
 if [ -e ./baserom.us.z64 ]; then
-	make -j16 VERSION=us
+	make -j VERSION=us
 	mksquashfs build/us_350h/sm64.us.f3dex2e opk/sm64.png opk/sm64_us."$1".desktop opk/menu_resources/ sm64_us_gkd350h.opk
 fi
 if [ -e ./baserom.jp.z64 ]; then
-	make -j16 VERSION=jp
+	make -j VERSION=jp
 	mksquashfs build/jp_350h/sm64.jp.f3dex2e opk/sm64.png opk/sm64_jp."$1".desktop opk/menu_resources/ sm64_jp_gkd350h.opk
+fi
+if [ -e ./baserom.eu.z64 ]; then
+	make -j VERSION=eu
+	mksquashfs build/eu_350h/sm64.eu.f3dex2e opk/sm64.png opk/sm64_eu."$1".desktop opk/menu_resources/ sm64_eu_gkd350h.opk
 fi
