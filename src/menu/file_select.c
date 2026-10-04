@@ -1877,9 +1877,9 @@ void score_menu_display_message(s8 messageID) {
     #define COPYFILE_X1  127
     #define ERASEFILE_X1 216
 #elif VERSION_EU
-    #define RETURN_X     centeredX
+    #define RETURN_X     centeredX + 12
     #define COPYFILE_X1  centeredX
-    #define ERASEFILE_X1 centeredX
+    #define ERASEFILE_X1 centeredX - 8
 #else
     #define RETURN_X     56
     #define COPYFILE_X1  135
@@ -2080,7 +2080,7 @@ void copy_menu_update_message(void) {
     #define ERASEFILE_X2 216
 #elif VERSION_EU
     #define VIEWSCORE_X1 centeredX
-    #define ERASEFILE_X2 centeredX
+    #define ERASEFILE_X2 centeredX - 8
 #else
     #define VIEWSCORE_X1 128
     #define ERASEFILE_X2 218
@@ -2369,11 +2369,11 @@ void print_erase_menu_strings(void) {
 
 #ifdef VERSION_EU
     centeredX = get_str_x_pos_from_center(69, textReturn[sLanguageMode], 10.0f);
-    print_generic_string(centeredX, 35, textReturn[sLanguageMode]);
+    print_generic_string(centeredX + 11, 35, textReturn[sLanguageMode]);
     centeredX = get_str_x_pos_from_center(159, textViewScore[sLanguageMode], 10.0f);
     print_generic_string(centeredX, 35, textViewScore[sLanguageMode]);
     centeredX = get_str_x_pos_from_center(249, textCopyFileButton[sLanguageMode], 10.0f);
-    print_generic_string(centeredX, 35, textCopyFileButton[sLanguageMode]);
+    print_generic_string(centeredX - 11, 35, textCopyFileButton[sLanguageMode]);
 #else
     print_generic_string(RETURN_X, 35, textReturn);
     print_generic_string(VIEWSCORE_X2, 35, textViewScore);
@@ -2708,8 +2708,20 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
     // Print current coin score mode
     if (sScoreFileCoinScoreMode == 0) {
 #ifdef VERSION_EU
-        print_menu_generic_string(get_str_x_pos_from_center(257, textMyScore[sLanguageMode], 10.0f),
+    switch (eu_get_language()) {
+        case LANGUAGE_ENGLISH:
+        print_menu_generic_string(get_str_x_pos_from_center(256, textMyScore[sLanguageMode], 10.0f),
             24, textMyScore[sLanguageMode]);
+			break;
+        case LANGUAGE_FRENCH:
+        print_menu_generic_string(get_str_x_pos_from_center(239, textMyScore[sLanguageMode], 10.0f),
+            24, textMyScore[sLanguageMode]);
+			break;
+        case LANGUAGE_GERMAN:
+        print_menu_generic_string(get_str_x_pos_from_center(240, textMyScore[sLanguageMode], 10.0f),
+            24, textMyScore[sLanguageMode]);
+			break;
+	}
 #elif VERSION_JP
         print_menu_generic_string(MYSCORE_X - 10, 24, textMyScore);
 #else
@@ -2717,8 +2729,20 @@ void print_score_file_star_score(s8 fileIndex, s16 courseIndex, s16 x, s16 y) {
 #endif
     } else {
 #ifdef VERSION_EU
+    switch (eu_get_language()) {
+        case LANGUAGE_ENGLISH:
         print_menu_generic_string(get_str_x_pos_from_center(257, textHiScore[sLanguageMode], 10.0f),
             24,textHiScore[sLanguageMode]);
+            break;
+        case LANGUAGE_FRENCH:
+        print_menu_generic_string(get_str_x_pos_from_center(239, textHiScore[sLanguageMode], 10.0f),
+            24,textHiScore[sLanguageMode]);
+            break;
+        case LANGUAGE_GERMAN:
+        print_menu_generic_string(get_str_x_pos_from_center(240, textHiScore[sLanguageMode], 10.0f),
+            24,textHiScore[sLanguageMode]);
+            break;
+	}
 #elif VERSION_JP
         print_menu_generic_string(HISCORE_X - 10, 24, textHiScore);
 #else
